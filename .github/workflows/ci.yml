@@ -43,8 +43,8 @@ jobs:
           
       - name: Security scan with Bandit
         run: |
-          bandit -r . -f json -o bandit-report.json || true
-          bandit -r . --severity-level medium
+          bandit scan -f json -o bandit-report.json . || true
+          bandit scan --severity-level medium .
           
       - name: Check for security vulnerabilities in dependencies
         run: |

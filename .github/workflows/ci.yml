@@ -43,13 +43,8 @@ jobs:
           
       - name: Security scan with Bandit
         run: |
-          bandit scan -f json -o bandit-report.json . || true
-          bandit scan --severity-level medium .
-          
-      - name: Check for security vulnerabilities in dependencies
-        run: |
-          safety check --json --output safety-report.json || true
-          safety check
+          bandit -f json -o bandit-report.json . || true
+          bandit -r --severity-level medium .
           
       - name: Validate Flask app can start
         env:

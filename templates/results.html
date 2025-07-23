@@ -1,0 +1,323 @@
+{% extends "base.html" %}
+
+{% block title %}Job Search Results - {{ job_title }} in {{ location }}{% endblock %}
+
+{% block extra_head %}
+<style>
+    .ai-summary {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    }
+    .job-card {
+        transition: all 0.3s ease;
+        border-left: 4px solid transparent;
+    }
+    .job-card:hover {
+        border-left-color: #8b5cf6;
+        transform: translateX(4px);
+    }
+    .salary-badge {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Search Form (Compact) -->
+<div class="bg-white rounded-lg shadow-md p-6 mb-8">
+    <form method="POST" action="{{ url_for('search_jobs') }}" class="flex flex-col md:flex-row gap-4">
+        {{ form.hidden_tag() }}
+        <div class="flex-1">
+            {{ form.job_title(class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent", value=job_title) }}
+        </div>
+        <div class="flex-1">
+            {{ form.location(class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent", value=location) }}
+        </div>
+        <div>
+            {{ form.submit(class="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition duration-200") }}
+        </div>
+    </form>
+</div>
+
+<!-- AI Market Summary -->
+{% if ai_summary and not ai_summary.error %}
+<div class="ai-summary rounded-lg p-6 mb-8 text-white">
+    <div class="flex items-start space-x-4">
+        <div class="flex-shrink-0">
+            <div class="w-12 h-12 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                </svg>
+            </div>
+        </div>
+        <div class="flex-1">
+            <h2 class="text-xl font-bold mb-2">AI Market Insights</h2>
+            <p class="text-sm opacity-90 mb-3">Powered by GPT-4o • {{ ai_summary.job_count }} jobs analyzed</p>
+            <div class="bg-white bg-opacity-10 rounded-lg p-4">
+                <div class="leading-relaxed whitespace-pre-line">{{ ai_summary.summary }}</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% elif ai_summary and ai_summary.error %}
+<div class="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded-lg mb-8">
+    <div class="flex">
+        <div class="flex-shrink-0">
+            <svg class="h-5 w-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+            </svg>
+        </div>
+        <div class="ml-3">
+            <p class="text-sm">AI summary temporarily unavailable. Job results are still available below.</p>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Search Results Header -->
+<div class="flex justify-between items-center mb-6">
+    <div>
+        <h1 class="text-2xl font-bold text-gray-900">
+            {{ search_results.count or 0 }} Jobs Found
+        </h1>
+        <p class="text-gray-600">{{ job_title }} positions in {{ location }}</p>
+    </div>
+    
+    {% if current_user.is_authenticated %}
+    <div class="text-sm text-gray-500">
+        <svg class="inline w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"></path>
+        </svg>
+        Click the bookmark icon to save jobs
+    </div>
+    {% endif %}
+</div>
+
+<!-- Error Message -->
+{% if search_results.error %}
+<div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg mb-8">
+    <div class="flex">
+        <div class="flex-shrink-0">
+            <svg class="h-5 w-5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
+            </svg>
+        </div>
+        <div class="ml-3">
+            <p class="text-sm font-medium">{{ search_results.error }}</p>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Job Results -->
+{% if search_results.results %}
+<div class="space-y-6">
+    {% for job in search_results.results %}
+    <div class="job-card bg-white rounded-lg shadow-md p-6 hover:shadow-lg">
+        <div class="flex justify-between items-start mb-4">
+            <div class="flex-1">
+                <h3 class="text-xl font-semibold text-gray-900 mb-2">
+                    <a href="{{ job.redirect_url }}" target="_blank" class="hover:text-purple-600 transition duration-200">
+                        {{ job.title }}
+                    </a>
+                </h3>
+                <div class="flex flex-wrap items-center gap-4 text-sm text-gray-600 mb-3">
+                    <div class="flex items-center">
+                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+                        </svg>
+                        {{ job.company }}
+                    </div>
+                    <div class="flex items-center">
+                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                        </svg>
+                        {{ job.location }}
+                    </div>
+                    {% if job.contract_type and job.contract_type != 'Not specified' %}
+                    <div class="flex items-center">
+                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        {{ job.contract_type }}
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <!-- Salary Information -->
+                {% if job.salary_min or job.salary_max %}
+                <div class="mb-3">
+                    <span class="salary-badge text-white px-3 py-1 rounded-full text-sm font-medium">
+                        {% if job.salary_min and job.salary_max %}
+                            £{{ "{:,.0f}".format(job.salary_min) }} - £{{ "{:,.0f}".format(job.salary_max) }}
+                        {% elif job.salary_min %}
+                            £{{ "{:,.0f}".format(job.salary_min) }}+
+                        {% elif job.salary_max %}
+                            Up to £{{ "{:,.0f}".format(job.salary_max) }}
+                        {% endif %}
+                        {% if job.salary_is_predicted %}
+                            <span class="opacity-75">(estimated)</span>
+                        {% endif %}
+                    </span>
+                </div>
+                {% endif %}
+                
+                <!-- Job Description -->
+                <div class="text-gray-700 mb-4">
+                    <p class="line-clamp-3">{{ job.description[:300] }}{% if job.description|length > 300 %}...{% endif %}</p>
+                </div>
+                
+                <!-- Job Category -->
+                {% if job.category and job.category != 'Other' %}
+                <div class="mb-4">
+                    <span class="bg-gray-100 text-gray-800 px-2 py-1 rounded text-xs font-medium">
+                        {{ job.category }}
+                    </span>
+                </div>
+                {% endif %}
+            </div>
+            
+            <!-- Action Buttons -->
+            <div class="flex flex-col space-y-2 ml-4">
+                {% if current_user.is_authenticated %}
+                <button class="save-job-btn bg-purple-100 text-purple-600 hover:bg-purple-200 p-2 rounded-lg transition duration-200"
+                        title="Save Job"
+                        data-job-id="{{ job.id }}"
+                        data-job-title="{{ job.title }}"
+                        data-company="{{ job.company }}"
+                        data-location="{{ job.location }}"
+                        data-salary-min="{{ job.salary_min or '' }}"
+                        data-salary-max="{{ job.salary_max or '' }}"
+                        data-job-url="{{ job.redirect_url }}"
+                        data-description="{{ job.description }}">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"></path>
+                    </svg>
+                </button>
+                {% endif %}
+                <a href="{{ job.redirect_url }}" target="_blank" 
+                   class="bg-blue-100 text-blue-600 hover:bg-blue-200 p-2 rounded-lg transition duration-200" 
+                   title="View Job">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                    </svg>
+                </a>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Pagination -->
+{% if search_results.total_pages > 1 %}
+<div class="flex justify-center mt-12">
+    <nav class="flex space-x-2">
+        {% if page > 1 %}
+        <a href="{{ url_for('search_jobs', job_title=job_title, location=location, page=page-1) }}" 
+           class="px-3 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition duration-200">
+            Previous
+        </a>
+        {% endif %}
+        
+        {% for p in range(max(1, page-2), min(search_results.total_pages+1, page+3)) %}
+        {% if p == page %}
+        <span class="px-3 py-2 bg-purple-600 text-white rounded-lg">{{ p }}</span>
+        {% else %}
+        <a href="{{ url_for('search_jobs', job_title=job_title, location=location, page=p) }}" 
+           class="px-3 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition duration-200">
+            {{ p }}
+        </a>
+        {% endif %}
+        {% endfor %}
+        
+        {% if page < search_results.total_pages %}
+        <a href="{{ url_for('search_jobs', job_title=job_title, location=location, page=page+1) }}" 
+           class="px-3 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition duration-200">
+            Next
+        </a>
+        {% endif %}
+    </nav>
+</div>
+{% endif %}
+
+{% else %}
+<!-- No Results -->
+<div class="text-center py-12">
+    <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+    </svg>
+    <h3 class="text-lg font-medium text-gray-900 mb-2">No jobs found</h3>
+    <p class="text-gray-500 mb-6">Try adjusting your search terms or location.</p>
+    <a href="{{ url_for('index') }}" class="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 transition duration-200">
+        New Search
+    </a>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Add event listeners to save job buttons
+    document.querySelectorAll('.save-job-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const jobData = {
+                job_id: this.dataset.jobId,
+                job_title: this.dataset.jobTitle,
+                company: this.dataset.company,
+                location: this.dataset.location,
+                salary_min: this.dataset.salaryMin ? parseFloat(this.dataset.salaryMin) : null,
+                salary_max: this.dataset.salaryMax ? parseFloat(this.dataset.salaryMax) : null,
+                job_url: this.dataset.jobUrl,
+                description: this.dataset.description
+            };
+            
+            saveJob(jobData, this);
+        });
+    });
+});
+
+function saveJob(jobData, buttonElement) {
+    fetch('/save_job', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(jobData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Show success message
+            showNotification(data.message, 'success');
+            // Update button state
+            buttonElement.innerHTML = `
+                <svg class="w-5 h-5" fill="currentColor" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"></path>
+                </svg>
+            `;
+            buttonElement.disabled = true;
+            buttonElement.classList.add('opacity-50');
+        } else {
+            showNotification(data.message, 'error');
+        }
+    })
+    .catch(error => {
+        showNotification('Failed to save job', 'error');
+    });
+}
+
+function showNotification(message, type) {
+    const notification = document.createElement('div');
+    notification.className = `fixed top-4 right-4 p-4 rounded-lg shadow-lg z-50 ${
+        type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
+    }`;
+    notification.textContent = message;
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        notification.remove();
+    }, 3000);
+}
+</script>
+{% endblock %}

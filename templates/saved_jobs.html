@@ -1,0 +1,284 @@
+{% extends "base.html" %}
+
+{% block title %}Saved Jobs - Job Sight{% endblock %}
+
+{% block content %}
+<div class="mb-8">
+    <h1 class="text-3xl font-bold text-gray-900 mb-2">Your Saved Jobs</h1>
+    <p class="text-gray-600">Manage your saved job opportunities and track your recruitment pipeline.</p>
+</div>
+
+<!-- Stats Cards -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <div class="flex items-center">
+            <div class="flex-shrink-0">
+                <div class="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+                    <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"></path>
+                    </svg>
+                </div>
+            </div>
+            <div class="ml-4">
+                <p class="text-sm font-medium text-gray-500">Total Saved</p>
+                <p class="text-2xl font-semibold text-gray-900">{{ saved_jobs.total }}</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <div class="flex items-center">
+            <div class="flex-shrink-0">
+                <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                    <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                </div>
+            </div>
+            <div class="ml-4">
+                <p class="text-sm font-medium text-gray-500">This Week</p>
+                <p class="text-2xl font-semibold text-gray-900">{{ saved_jobs.items|selectattr('saved_at', 'ge', (moment().subtract(7, 'days')))|list|length if moment else '0' }}</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <div class="flex items-center">
+            <div class="flex-shrink-0">
+                <div class="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                    <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                    </svg>
+                </div>
+            </div>
+            <div class="ml-4">
+                <p class="text-sm font-medium text-gray-500">Current Page</p>
+                <p class="text-2xl font-semibold text-gray-900">{{ saved_jobs.items|length }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if saved_jobs.items %}
+<!-- Saved Jobs List -->
+<div class="space-y-6">
+    {% for job in saved_jobs.items %}
+    <div class="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition duration-200">
+        <div class="flex justify-between items-start">
+            <div class="flex-1">
+                <div class="flex justify-between items-start mb-4">
+                    <div>
+                        <h3 class="text-xl font-semibold text-gray-900 mb-2">
+                            <a href="{{ job.job_url }}" target="_blank" class="hover:text-purple-600 transition duration-200">
+                                {{ job.job_title }}
+                            </a>
+                        </h3>
+                        <div class="flex flex-wrap items-center gap-4 text-sm text-gray-600 mb-3">
+                            <div class="flex items-center">
+                                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+                                </svg>
+                                {{ job.company }}
+                            </div>
+                            <div class="flex items-center">
+                                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                </svg>
+                                {{ job.location }}
+                            </div>
+                            <div class="flex items-center">
+                                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                                Saved {{ job.saved_at.strftime('%b %d, %Y') }}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Salary Badge -->
+                    {% if job.salary_min or job.salary_max %}
+                    <div class="ml-4">
+                        <span class="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-3 py-1 rounded-full text-sm font-medium">
+                            {{ job.get_salary_range() }}
+                        </span>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <!-- Job Description -->
+                {% if job.description %}
+                <div class="text-gray-700 mb-4">
+                    <p class="line-clamp-2">{{ job.description[:200] }}{% if job.description|length > 200 %}...{% endif %}</p>
+                </div>
+                {% endif %}
+                
+                <!-- Action Buttons -->
+                <div class="flex space-x-3">
+                    <a href="{{ job.job_url }}" target="_blank" 
+                       class="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition duration-200">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                        </svg>
+                        View Job
+                    </a>
+                    
+                    <button onclick="removeJob('{{ job.job_id }}')" 
+                            class="inline-flex items-center px-4 py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition duration-200">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                        </svg>
+                        Remove
+                    </button>
+                    
+                    <button onclick="copyJobDetails('{{ job.job_title|e }}', '{{ job.company|e }}', '{{ job.location|e }}', '{{ job.job_url|e }}')" 
+                            class="inline-flex items-center px-4 py-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200 transition duration-200">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                        </svg>
+                        Copy Details
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Pagination -->
+{% if saved_jobs.pages > 1 %}
+<div class="flex justify-center mt-12">
+    <nav class="flex space-x-2">
+        {% if saved_jobs.has_prev %}
+        <a href="{{ url_for('saved_jobs', page=saved_jobs.prev_num) }}" 
+           class="px-3 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition duration-200">
+            Previous
+        </a>
+        {% endif %}
+        
+        {% for page_num in saved_jobs.iter_pages() %}
+        {% if page_num %}
+        {% if page_num != saved_jobs.page %}
+        <a href="{{ url_for('saved_jobs', page=page_num) }}" 
+           class="px-3 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition duration-200">
+            {{ page_num }}
+        </a>
+        {% else %}
+        <span class="px-3 py-2 bg-purple-600 text-white rounded-lg">{{ page_num }}</span>
+        {% endif %}
+        {% else %}
+        <span class="px-3 py-2">...</span>
+        {% endif %}
+        {% endfor %}
+        
+        {% if saved_jobs.has_next %}
+        <a href="{{ url_for('saved_jobs', page=saved_jobs.next_num) }}" 
+           class="px-3 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition duration-200">
+            Next
+        </a>
+        {% endif %}
+    </nav>
+</div>
+{% endif %}
+
+{% else %}
+<!-- Empty State -->
+<div class="text-center py-16">
+    <svg class="mx-auto h-16 w-16 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"></path>
+    </svg>
+    <h3 class="text-xl font-medium text-gray-900 mb-2">No saved jobs yet</h3>
+    <p class="text-gray-500 mb-8 max-w-md mx-auto">
+        Start building your recruitment pipeline by saving interesting job opportunities from your searches.
+    </p>
+    <a href="{{ url_for('index') }}" 
+       class="inline-flex items-center px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition duration-200">
+        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+        </svg>
+        Search for Jobs
+    </a>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function removeJob(jobId) {
+    if (confirm('Are you sure you want to remove this job from your saved list?')) {
+        fetch('/unsave_job', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                job_id: jobId
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showNotification(data.message, 'success');
+                // Reload the page to update the list
+                setTimeout(() => {
+                    location.reload();
+                }, 1000);
+            } else {
+                showNotification(data.message, 'error');
+            }
+        })
+        .catch(error => {
+            showNotification('Failed to remove job', 'error');
+        });
+    }
+}
+
+function copyJobDetails(title, company, location, url) {
+    const jobDetails = `Job Title: ${title}\nCompany: ${company}\nLocation: ${location}\nURL: ${url}`;
+    
+    if (navigator.clipboard) {
+        navigator.clipboard.writeText(jobDetails).then(() => {
+            showNotification('Job details copied to clipboard', 'success');
+        }).catch(() => {
+            fallbackCopyTextToClipboard(jobDetails);
+        });
+    } else {
+        fallbackCopyTextToClipboard(jobDetails);
+    }
+}
+
+function fallbackCopyTextToClipboard(text) {
+    const textArea = document.createElement("textarea");
+    textArea.value = text;
+    textArea.style.top = "0";
+    textArea.style.left = "0";
+    textArea.style.position = "fixed";
+    
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    
+    try {
+        document.execCommand('copy');
+        showNotification('Job details copied to clipboard', 'success');
+    } catch (err) {
+        showNotification('Failed to copy job details', 'error');
+    }
+    
+    document.body.removeChild(textArea);
+}
+
+function showNotification(message, type) {
+    const notification = document.createElement('div');
+    notification.className = `fixed top-4 right-4 p-4 rounded-lg shadow-lg z-50 ${
+        type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
+    }`;
+    notification.textContent = message;
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        notification.remove();
+    }, 3000);
+}
+</script>
+{% endblock %}

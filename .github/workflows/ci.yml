@@ -63,6 +63,25 @@ jobs:
               sys.exit(1)
           "
           
+      - name: Run tests with pytest
+        env:
+          SECRET_KEY: test-secret-key
+          SQLALCHEMY_DATABASE_URI: sqlite:///test.db
+          ADZUNA_APP_ID: test-app-id
+          ADZUNA_APP_KEY: test-app-key
+          AZURE_AI_ENDPOINT: https://test.openai.azure.com/
+          AZURE_AI_KEY: test-azure-key
+        run: |
+          python -m pytest tests/ -v --tb=short --cov=. --cov-report=term-missing --cov-report=xml
+          
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v3
+        if: always()
+        with:
+          file: ./coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+          
       - name: Upload security reports
         uses: actions/upload-artifact@v4
         if: always()

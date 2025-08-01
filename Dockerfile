@@ -1,23 +1,26 @@
-# Use official Python image as base
-FROM python:3.11-slim
+# Use official Python image as base with latest security patches
+FROM python:3.12-alpine
 
 # Set working directory
 WORKDIR /app
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
+# Install system dependencies and security updates
+RUN apk update && apk add --no-cache \
     gcc \
-    && rm -rf /var/lib/apt/lists/*
+    musl-dev \
+    linux-headers \
+    && apk upgrade
 
 # Install dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --upgrade pip setuptools>=78.1.1 && \
+    pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY . .
 
 # Create a non-root user for security
-RUN useradd --create-home --shell /bin/bash app && chown -R app:app /app
+RUN adduser -D -s /bin/sh app && chown -R app:app /app
 USER app
 
 # Tell Flask which app to load

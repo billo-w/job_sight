@@ -1,48 +1,35 @@
 import pytest
 import tempfile
 import os
-from app import create_app
+from flask import Flask
 from models import db, User, SavedJob, SearchHistory
+from tests.config import TestConfig
 
 
 @pytest.fixture
 def app():
-    """Create and configure a new app instance for each test."""
-    # Create a temporary file to serve as the database
-    db_fd, db_path = tempfile.mkstemp()
+    """Create a simple test app."""
+    test_config = TestConfig()
     
-    app = create_app()
-    app.config.update({
-        'TESTING': True,
-        'SQLALCHEMY_DATABASE_URI': f'sqlite:///{db_path}',
-        'SECRET_KEY': 'test-secret-key',
-        'WTF_CSRF_ENABLED': False,  # Disable CSRF for testing
-        'ADZUNA_APP_ID': 'test-app-id',
-        'ADZUNA_APP_KEY': 'test-app-key',
-        'AZURE_AI_ENDPOINT': 'https://test.openai.azure.com/',
-        'AZURE_AI_KEY': 'test-azure-key',
-    })
-    
-    with app.app_context():
-        db.create_all()
-        yield app
-        db.drop_all()
-    
-    # Clean up the temporary database file
-    os.close(db_fd)
-    os.unlink(db_path)
+    try:
+        app = Flask(__name__)
+        app.config.from_object(test_config)
+        
+        # Initialize database
+        db.init_app(app)
+        
+        with app.app_context():
+            db.create_all()
+            yield app
+            db.drop_all()
+    finally:
+        test_config.cleanup()
 
 
 @pytest.fixture
 def client(app):
     """A test client for the app."""
     return app.test_client()
-
-
-@pytest.fixture
-def runner(app):
-    """A test runner for the app's Click commands."""
-    return app.test_cli_runner()
 
 
 @pytest.fixture
@@ -59,16 +46,6 @@ def test_user(app):
         db.session.add(user)
         db.session.commit()
         return user
-
-
-@pytest.fixture
-def authenticated_client(client, test_user):
-    """A client with an authenticated user."""
-    client.post('/login', data={
-        'username': test_user.username,
-        'password': 'testpassword123'
-    })
-    return client
 
 
 @pytest.fixture

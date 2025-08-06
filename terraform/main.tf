@@ -11,9 +11,17 @@ provider "digitalocean" {
   token       = var.do_token
 }
 
+resource "digitalocean_container_registry" "app_registry" {
+  name                   = "job-sight-app"
+  subscription_tier_slug = "basic"
+}
+
 resource "digitalocean_project" "project" {
   name        = "Job-Sight-Project"
-  resources   = [digitalocean_app.app.urn]
+  resources   = [
+    digitalocean_app.app.urn,
+    digitalocean_container_registry.app_registry.urn
+  ]
 }
 
 resource "digitalocean_app" "app" {

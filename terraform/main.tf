@@ -52,12 +52,6 @@ resource "digitalocean_app" "app" {
           enabled = true
         }
       }
-      log_destination {
-        name = "logtail"
-        logtail {
-          token = var.logtail_source_token
-        }
-      }
       alert {
         rule     = "CPU_UTILIZATION"
         value    = 70
@@ -99,10 +93,6 @@ resource "digitalocean_app" "app" {
       env {
         key   = "AZURE_AI_KEY"
         value = var.azure_ai_key
-      }
-      env {
-        key   = "LOGTAIL_SOURCE_TOKEN"
-        value = var.logtail_source_token
       }
     }
   }

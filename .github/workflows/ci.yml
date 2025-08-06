@@ -110,7 +110,6 @@ jobs:
       TF_VAR_adzuna_app_key: ${{ secrets.ADZUNA_APP_KEY }}
       TF_VAR_azure_ai_endpoint: ${{ secrets.AZURE_AI_ENDPOINT }}
       TF_VAR_azure_ai_key:      ${{ secrets.AZURE_AI_KEY }}
-      TF_VAR_logtail_source_token: ${{ secrets.LOGTAIL_SOURCE_TOKEN }}
 
       AWS_ACCESS_KEY_ID:     ${{ secrets.SPACES_ACCESS_KEY }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.SPACES_SECRET_KEY }}
@@ -144,20 +143,53 @@ jobs:
           docker push registry.digitalocean.com/job-sight-app/job-sight:${{ github.sha }}
 
       - name: Install Terraform
-        uses: hashicorp/setup-terraform@v2
+        uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: '1.6.3'
 
       - name: Terraform Init
         working-directory: terraform
-        run: terraform init -reconfigure
-
+        run: |
+          terraform init -reconfigure -upgrade
+          
       - name: Terraform Validate
         working-directory: terraform
         run: terraform validate
 
-      - name: Terraform Plan & Apply
+      - name: Terraform Plan
         working-directory: terraform
         run: |
-          terraform plan -out=tfplan
-          terraform apply -auto-approve tfplan
+          terraform plan -out=tfplan -detailed-exitcode
+        continue-on-error: false
+
+      - name: Terraform Apply with Retry
+        working-directory: terraform
+        run: |
+          # Function to retry terraform apply
+          retry_terraform_apply() {
+            local max_attempts=3
+            local attempt=1
+            
+            while [ $attempt -le $max_attempts ]; do
+              echo "Terraform apply attempt $attempt of $max_attempts"
+              
+              if terraform apply -auto-approve tfplan; then
+                echo "Terraform apply succeeded on attempt $attempt"
+                return 0
+              else
+                echo "Terraform apply failed on attempt $attempt"
+                if [ $attempt -lt $max_attempts ]; then
+                  echo "Waiting 30 seconds before retry..."
+                  sleep 30
+                  # Refresh the plan for retry
+                  terraform plan -out=tfplan -refresh=true
+                fi
+                attempt=$((attempt + 1))
+              fi
+            done
+            
+            echo "Terraform apply failed after $max_attempts attempts"
+            return 1
+          }
+          
+          retry_terraform_apply

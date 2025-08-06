@@ -32,11 +32,6 @@ variable "azure_ai_key" {
   sensitive   = true
 }
 
-variable "logtail_source_token" {
-  description = "Logtail source token for logging"
-  type        = string
-  sensitive   = true
-}
 
 variable "database_url" {
   description = "Connection string for PostgreSQL database"

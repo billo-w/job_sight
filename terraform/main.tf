@@ -46,7 +46,7 @@ resource "digitalocean_app" "app" {
 
       image {
         registry_type = "DOCR"
-        repository    = "${digitalocean_container_registry.app_registry.name}/job-sight"
+        repository    = "job-sight"
         tag           = "latest"
         deploy_on_push {
           enabled = true

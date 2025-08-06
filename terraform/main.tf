@@ -2,13 +2,13 @@ terraform {
   required_providers {
     digitalocean = {
       source  = "digitalocean/digitalocean"
-      version = "~> 2.0"
+      version = "~> 2.40.0"
     }
   }
 }
 
 provider "digitalocean" {
-  token       = var.do_token
+  token = var.do_token
 }
 
 resource "digitalocean_container_registry" "app_registry" {
@@ -18,14 +18,22 @@ resource "digitalocean_container_registry" "app_registry" {
 
 resource "digitalocean_project" "project" {
   name        = "Job-Sight-Project"
-  resources   = [
-    digitalocean_app.app.urn
-  ]
+  description = "Job Sight Application Project"
+  purpose     = "Web Application"
+  environment = "Production"
+
+  # Remove the direct dependency to avoid circular reference issues
+  # Resources can be added after app creation
 }
 
 resource "digitalocean_app" "app" {
+  # Ensure registry is created first
+  depends_on = [digitalocean_container_registry.app_registry]
+
   spec {
-    name = "job-sight-app"
+    name   = "job-sight-app"
+    region = "lon"
+
     alert {
       rule = "DEPLOYMENT_FAILED"
     }
@@ -38,7 +46,7 @@ resource "digitalocean_app" "app" {
 
       image {
         registry_type = "DOCR"
-        repository    = "job-sight-app/job-sight"
+        repository    = "${digitalocean_container_registry.app_registry.name}/job-sight"
         tag           = "latest"
         deploy_on_push {
           enabled = true
@@ -51,17 +59,17 @@ resource "digitalocean_app" "app" {
         }
       }
       alert {
-        rule = "CPU_UTILIZATION"
-        value = 70
+        rule     = "CPU_UTILIZATION"
+        value    = 70
         operator = "GREATER_THAN"
-        window = "FIVE_MINUTES"
+        window   = "FIVE_MINUTES"
         disabled = false
       }
       alert {
-        rule = "MEM_UTILIZATION"
-        value = 70
+        rule     = "MEM_UTILIZATION"
+        value    = 70
         operator = "GREATER_THAN"
-        window = "FIVE_MINUTES"
+        window   = "FIVE_MINUTES"
         disabled = false
       }
       env {
@@ -98,4 +106,20 @@ resource "digitalocean_app" "app" {
       }
     }
   }
+
+  timeouts {
+    create = "20m"
+  }
+}
+
+# Add project resources after app creation to avoid dependency issues
+resource "digitalocean_project_resources" "project_resources" {
+  project = digitalocean_project.project.id
+  resources = [
+    digitalocean_app.app.urn
+  ]
+  
+  depends_on = [
+    digitalocean_app.app
+  ]
 }

@@ -99,6 +99,21 @@ jobs:
     needs: build-and-test
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    env:
+      # DO App Platform vars
+      TF_VAR_do_token:       ${{ secrets.DO_TOKEN }}
+      TF_VAR_github_repo:    ${{ github.repository }}
+      TF_VAR_secret_key:     ${{ secrets.SECRET_KEY }}
+      TF_VAR_flask_env:      ${{ secrets.FLASK_ENV }}
+      TF_VAR_database_url:   ${{ secrets.DATABASE_URL }}
+      TF_VAR_adzuna_app_id:  ${{ secrets.ADZUNA_APP_ID }}
+      TF_VAR_adzuna_app_key: ${{ secrets.ADZUNA_APP_KEY }}
+      TF_VAR_azure_ai_endpoint: ${{ secrets.AZURE_AI_ENDPOINT }}
+      TF_VAR_azure_ai_key:      ${{ secrets.AZURE_AI_KEY }}
+      TF_VAR_logtail_source_token: ${{ secrets.LOGTAIL_SOURCE_TOKEN }}
+
+      AWS_ACCESS_KEY_ID:     ${{ secrets.SPACES_ACCESS_KEY }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.SPACES_SECRET_KEY }}
     steps:
       - uses: actions/checkout@v4
       
@@ -127,3 +142,22 @@ jobs:
           docker tag job-sight:latest registry.digitalocean.com/job-sight-app/job-sight:${{ github.sha }}
           docker push registry.digitalocean.com/job-sight-app/job-sight:latest
           docker push registry.digitalocean.com/job-sight-app/job-sight:${{ github.sha }}
+
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: '1.6.3'
+
+      - name: Terraform Init
+        working-directory: terraform
+        run: terraform init -reconfigure
+
+      - name: Terraform Validate
+        working-directory: terraform
+        run: terraform validate
+
+      - name: Terraform Plan & Apply
+        working-directory: terraform
+        run: |
+          terraform plan -out=tfplan
+          terraform apply -auto-approve tfplan

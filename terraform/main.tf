@@ -19,8 +19,7 @@ resource "digitalocean_container_registry" "app_registry" {
 resource "digitalocean_project" "project" {
   name        = "Job-Sight-Project"
   resources   = [
-    digitalocean_app.app.urn,
-    digitalocean_container_registry.app_registry.urn
+    digitalocean_app.app.urn
   ]
 }
 

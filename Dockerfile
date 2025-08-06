@@ -28,5 +28,5 @@ ENV FLASK_APP=app.py
 ENV PYTHONPATH=/app
 
 # Expose port and run
-EXPOSE 5000
-CMD ["gunicorn", "-b", "0.0.0.0:5000", "app:app"]
+EXPOSE 8080
+CMD ["gunicorn", "-b", "0.0.0.0:8080", "app:app"]

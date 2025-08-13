@@ -28,13 +28,6 @@ resource "digitalocean_app" "app" {
 
     alert {
       rule = "DEPLOYMENT_FAILED"
-      destinations {
-          emails = [var.email]
-          slack_webhooks {
-            channel = var.slack_channel
-            url     = var.slack_webhook_url
-          }
-        }
     }
 
     service {
@@ -53,7 +46,7 @@ resource "digitalocean_app" "app" {
       }
 
       log_destination {
-        name = "do_logtaiil"
+        name = "do_logtail"
         logtail {
           token = var.logtail_token
         }
@@ -65,15 +58,6 @@ resource "digitalocean_app" "app" {
         operator = "GREATER_THAN"
         window   = "FIVE_MINUTES"
         disabled = false
-
-        destinations {
-          emails = [var.email]
-          slack_webhooks {
-            channel = var.slack_channel
-            url     = var.slack_webhook_url
-          }
-        }
-
       }
       alert {
         rule     = "MEM_UTILIZATION"
@@ -81,14 +65,6 @@ resource "digitalocean_app" "app" {
         operator = "GREATER_THAN"
         window   = "FIVE_MINUTES"
         disabled = false
-
-        destinations {
-          emails = [var.email]
-          slack_webhooks {
-            channel = var.slack_channel
-            url     = var.slack_webhook_url
-          }
-        }        
       }
       env {
         key   = "SECRET_KEY"

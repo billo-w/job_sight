@@ -32,7 +32,6 @@ variable "azure_ai_key" {
   sensitive   = true
 }
 
-
 variable "database_url" {
   description = "Connection string for PostgreSQL database"
   type        = string
@@ -49,4 +48,31 @@ variable "flask_env" {
   description = "Flask environment (development, production, etc.)"
   type        = string
   default     = "production"
+}
+
+variable "slack_webhook_url" {
+  description = "Slack webhook URL for alerts"
+  type        = string
+  sensitive   = true
+}
+
+variable "slack_channel" {
+  description = "Slack channel for alerts"
+  type        = string
+  default     = "#alert-tracker"
+}
+
+variable "email" {
+  description = "Email address for alert notifications"
+  type        = string
+}
+
+variable "logtail_token" {
+  description = "Logtail token for log management"
+  type        = string
+  sensitive   = true
+}
+variable "project_id" {
+  description = "DigitalOcean project ID for the application"
+  type        = string
 }

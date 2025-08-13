@@ -110,7 +110,11 @@ jobs:
       TF_VAR_adzuna_app_key: ${{ secrets.ADZUNA_APP_KEY }}
       TF_VAR_azure_ai_endpoint: ${{ secrets.AZURE_AI_ENDPOINT }}
       TF_VAR_azure_ai_key:      ${{ secrets.AZURE_AI_KEY }}
-
+      TF_VAR_email:         ${{ secrets.ALERT_EMAIL }}
+      TF_VAR_slack_channel:  ${{ secrets.SLACK_CHANNEL }}
+      TF_VAR_slack_webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+      TF_VAR_logtail_token:  ${{ secrets.LOGTAIL_TOKEN }}
+      TF_VAR_project_id:   ${{ secrets.DO_PROJECT_ID }}
       AWS_ACCESS_KEY_ID:     ${{ secrets.SPACES_ACCESS_KEY }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.SPACES_SECRET_KEY }}
     steps:

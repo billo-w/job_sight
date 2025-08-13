@@ -21,7 +21,7 @@ resource "digitalocean_project" "project" {
   description = "Job Sight Application Project"
   purpose     = "Web Application"
   environment = "Production"
-
+  is_default  = true
   # Remove the direct dependency to avoid circular reference issues
   # Resources can be added after app creation
 }

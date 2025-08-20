@@ -159,7 +159,7 @@ def create_app():
         response.headers['X-Frame-Options'] = 'DENY'
         response.headers['X-XSS-Protection'] = '1; mode=block'
         response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
-        response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline';"
+        response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' https://cdn.jsdelivr.net; img-src 'self' data: https:;"
         
         return response
 
@@ -253,11 +253,7 @@ def create_app():
                 job_title=job_title
             ).inc()
             
-            app.logger.info("Job search initiated",
-                           job_title=job_title,
-                           location=location,
-                           page=page,
-                           user_id=current_user.id if current_user.is_authenticated else None)
+            app.logger.info(f"Job search initiated - job_title: {job_title}, location: {location}, page: {page}, user_id: {current_user.id if current_user.is_authenticated else None}")
             
             # Initialize external service instances for API calls
             adzuna_api = AdzunaAPI()  # Job search API service
@@ -272,16 +268,10 @@ def create_app():
                     results_per_page=app.config['JOBS_PER_PAGE']  # Pagination limit from config
                 )
                 API_CALLS.labels(service='adzuna', status='success').inc()
-                app.logger.info("Adzuna API call successful",
-                               job_title=job_title,
-                               location=location,
-                               results_count=search_results.get('count', 0))
+                app.logger.info(f"Adzuna API call successful - job_title: {job_title}, location: {location}, results_count: {search_results.get('count', 0)}")
             except Exception as e:
                 API_CALLS.labels(service='adzuna', status='error').inc()
-                app.logger.error("Adzuna API call failed",
-                                error=str(e),
-                                job_title=job_title,
-                                location=location)
+                app.logger.error(f"Adzuna API call failed - error: {str(e)}, job_title: {job_title}, location: {location}")
                 search_results = {'error': 'Failed to fetch jobs', 'results': []}
             
             # Initialize AI summary variable
@@ -296,15 +286,10 @@ def create_app():
                         job_results=search_results['results']
                     )
                     API_CALLS.labels(service='azure_ai', status='success').inc()
-                    app.logger.info("Azure AI analysis completed",
-                                   job_title=job_title,
-                                   location=location)
+                    app.logger.info(f"Azure AI analysis completed - job_title: {job_title}, location: {location}")
                 except Exception as e:
                     API_CALLS.labels(service='azure_ai', status='error').inc()
-                    app.logger.error("Azure AI analysis failed",
-                                    error=str(e),
-                                    job_title=job_title,
-                                    location=location)
+                    app.logger.error(f"Azure AI analysis failed - error: {str(e)}, job_title: {job_title}, location: {location}")
             
             # Save search history for authenticated users only
             if current_user.is_authenticated:
@@ -321,15 +306,10 @@ def create_app():
                     # Commit transaction to persist data
                     db.session.commit()
                     DATABASE_OPERATIONS.labels(operation='insert', table='search_history').inc()
-                    app.logger.info("Search history saved",
-                                   user_id=current_user.id,
-                                   job_title=job_title,
-                                   location=location)
+                    app.logger.info(f"Search history saved - user_id: {current_user.id}, job_title: {job_title}, location: {location}")
                 except Exception as e:
                     # Log error for debugging and monitoring
-                    app.logger.error("Failed to save search history",
-                                    error=str(e),
-                                    user_id=current_user.id)
+                    app.logger.error(f"Failed to save search history - error: {str(e)}, user_id: {current_user.id}")
                     # Rollback transaction to maintain database consistency
                     db.session.rollback()
             

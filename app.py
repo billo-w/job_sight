@@ -84,11 +84,8 @@ def create_app():
     app.config.from_object(Config)
     
     # Initialize Flask-CORS for cross-origin resource sharing
-    # Allow all origins for monitoring endpoints to ensure dashboard works
-    CORS(app, resources={
-        r"/health": {"origins": "*"},
-        r"/metrics": {"origins": "*"}
-    })
+    # Configure CORS globally to ensure dashboard works
+    CORS(app, origins="*", supports_credentials=False)
     
     # Initialize Flask-Limiter for rate limiting
     limiter = Limiter(

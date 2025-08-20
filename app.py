@@ -4,6 +4,11 @@ from flask import Flask, render_template, request, redirect, url_for, flash, jso
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 # Import Flask-Migrate for database schema version control and migrations
 from flask_migrate import Migrate
+# Import Flask-CORS for cross-origin resource sharing
+from flask_cors import CORS
+# Import Flask-Limiter for rate limiting
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 # Import URL parsing utilities for secure redirect validation
 from urllib.parse import urlsplit
 # Import logging module for application monitoring and debugging
@@ -78,6 +83,21 @@ def create_app():
     # Load configuration from Config class - centralizes all app settings
     app.config.from_object(Config)
     
+    # Initialize Flask-CORS for cross-origin resource sharing
+    # Restrict origins to specific domains for security
+    allowed_origins = os.environ.get('ALLOWED_ORIGINS', 'http://localhost:3000,http://127.0.0.1:3000').split(',')
+    CORS(app, resources={
+        r"/health": {"origins": allowed_origins},
+        r"/metrics": {"origins": allowed_origins}
+    })
+    
+    # Initialize Flask-Limiter for rate limiting
+    limiter = Limiter(
+        app=app,
+        key_func=get_remote_address,
+        default_limits=["200 per day", "50 per hour"]
+    )
+    
     # Initialize SQLAlchemy database extension with the app instance
     # This creates the database connection pool and ORM functionality
     db.init_app(app)
@@ -120,7 +140,7 @@ def create_app():
 
     @app.after_request
     def after_request(response):
-        """Log response details and record metrics"""
+        """Log response details, record metrics, and add security headers"""
         if hasattr(request, 'start_time'):
             duration = time.time() - request.start_time
             REQUEST_LATENCY.observe(duration)
@@ -133,6 +153,13 @@ def create_app():
             ).inc()
             
             app.logger.info(f"Request completed - {request.method} {request.path} {response.status_code} ({duration:.3f}s)")
+        
+        # Add security headers
+        response.headers['X-Content-Type-Options'] = 'nosniff'
+        response.headers['X-Frame-Options'] = 'DENY'
+        response.headers['X-XSS-Protection'] = '1; mode=block'
+        response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+        response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline';"
         
         return response
 
@@ -447,6 +474,7 @@ def create_app():
         return render_template('saved_jobs.html', saved_jobs=saved_jobs)
 
     @app.route('/register', methods=['GET', 'POST'])
+    @limiter.limit("3 per minute")
     def register():
         """
         User registration route handler.
@@ -495,6 +523,7 @@ def create_app():
         return render_template('auth/register.html', form=form)
 
     @app.route('/login', methods=['GET', 'POST'])
+    @limiter.limit("5 per minute")
     def login():
         """
         User login route handler.

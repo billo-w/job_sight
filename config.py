@@ -19,10 +19,11 @@ class Config:
     """
     
     # Secret key for Flask session management and CSRF protection
-    # os.environ.get() retrieves environment variable with fallback default
     # Production deployments MUST set SECRET_KEY environment variable
-    # Default value is only for development - never use in production
-    SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key-change-in-production'
+    # No fallback default for security - application will fail if not set
+    SECRET_KEY = os.environ.get('SECRET_KEY')
+    if not SECRET_KEY:
+        raise ValueError("SECRET_KEY environment variable must be set for security")
     
     # Database URL configuration with PostgreSQL compatibility handling
     # Retrieves DATABASE_URL from environment for deployment flexibility

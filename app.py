@@ -84,11 +84,10 @@ def create_app():
     app.config.from_object(Config)
     
     # Initialize Flask-CORS for cross-origin resource sharing
-    # Allow file:// origins for local dashboard access
-    allowed_origins = os.environ.get('ALLOWED_ORIGINS', 'http://localhost:3000,http://127.0.0.1:3000,file://').split(',')
+    # Allow all origins for monitoring endpoints to ensure dashboard works
     CORS(app, resources={
-        r"/health": {"origins": allowed_origins},
-        r"/metrics": {"origins": allowed_origins}
+        r"/health": {"origins": "*"},
+        r"/metrics": {"origins": "*"}
     })
     
     # Initialize Flask-Limiter for rate limiting

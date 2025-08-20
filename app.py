@@ -4,8 +4,7 @@ from flask import Flask, render_template, request, redirect, url_for, flash, jso
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 # Import Flask-Migrate for database schema version control and migrations
 from flask_migrate import Migrate
-# Import Flask-CORS for cross-origin resource sharing
-from flask_cors import CORS
+
 # Import Flask-Limiter for rate limiting
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -19,7 +18,7 @@ from pythonjsonlogger import jsonlogger
 from datetime import datetime
 import time
 import os
-from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
+
 
 # Import local application modules
 from config import Config  # Application configuration class
@@ -28,13 +27,7 @@ from forms import RegistrationForm, LoginForm, JobSearchForm, SaveJobForm  # WTF
 from services.adzuna_api import AdzunaAPI  # External job search API service
 from services.azure_ai import AzureAIService  # Azure AI integration for job market analysis
 
-# Initialize Prometheus metrics
-REQUEST_COUNT = Counter('http_requests_total', 'Total HTTP requests', ['method', 'endpoint', 'status'])
-REQUEST_LATENCY = Histogram('http_request_duration_seconds', 'HTTP request latency')
-ACTIVE_USERS = Gauge('active_users', 'Number of active users')
-JOB_SEARCHES = Counter('job_searches_total', 'Total job searches', ['location', 'job_title'])
-API_CALLS = Counter('api_calls_total', 'Total API calls', ['service', 'status'])
-DATABASE_OPERATIONS = Counter('database_operations_total', 'Database operations', ['operation', 'table'])
+
 
 def setup_logging():
     """Configure structured logging for production monitoring"""
@@ -83,9 +76,7 @@ def create_app():
     # Load configuration from Config class - centralizes all app settings
     app.config.from_object(Config)
     
-    # Initialize Flask-CORS for cross-origin resource sharing
-    # Configure CORS globally to ensure dashboard works
-    CORS(app, origins="*", supports_credentials=False)
+
     
     # Initialize Flask-Limiter for rate limiting
     limiter = Limiter(
@@ -139,15 +130,6 @@ def create_app():
         """Log response details, record metrics, and add security headers"""
         if hasattr(request, 'start_time'):
             duration = time.time() - request.start_time
-            REQUEST_LATENCY.observe(duration)
-            
-            # Record request metrics
-            REQUEST_COUNT.labels(
-                method=request.method,
-                endpoint=request.endpoint or 'unknown',
-                status=response.status_code
-            ).inc()
-            
             app.logger.info(f"Request completed - {request.method} {request.path} {response.status_code} ({duration:.3f}s)")
         
         # Add security headers (CSP temporarily disabled for development)
@@ -172,44 +154,7 @@ def create_app():
         db.session.rollback()
         return render_template('500.html'), 500
 
-    # Health check endpoint for monitoring
-    @app.route('/health')
-    def health_check():
-        """Health check endpoint for monitoring systems"""
-        try:
-            # Test database connection
-            db.session.execute(db.text('SELECT 1'))
-            db_status = 'healthy'
-        except Exception as e:
-            app.logger.error(f"Database health check failed: {str(e)}")
-            db_status = 'unhealthy'
-        
-        # Test external API connections
-        try:
-            adzuna_api = AdzunaAPI()
-            adzuna_status = 'healthy'
-        except Exception as e:
-            app.logger.error(f"Adzuna API health check failed: {str(e)}")
-            adzuna_status = 'unhealthy'
-        
-        health_status = {
-            'status': 'healthy' if all([db_status == 'healthy', adzuna_status == 'healthy']) else 'unhealthy',
-            'timestamp': datetime.utcnow().isoformat(),
-            'services': {
-                'database': db_status,
-                'adzuna_api': adzuna_status
-            },
-            'version': os.getenv('APP_VERSION', '1.0.0')
-        }
-        
-        status_code = 200 if health_status['status'] == 'healthy' else 503
-        return jsonify(health_status), status_code
 
-    # Metrics endpoint for Prometheus
-    @app.route('/metrics')
-    def metrics():
-        """Prometheus metrics endpoint"""
-        return generate_latest(), 200, {'Content-Type': CONTENT_TYPE_LATEST}
 
     # Define application routes using Flask decorators
     
@@ -243,11 +188,7 @@ def create_app():
             # Get pagination parameter from URL query string, default to page 1
             page = request.args.get('page', 1, type=int)
             
-            # Record job search metrics
-            JOB_SEARCHES.labels(
-                location=location,
-                job_title=job_title
-            ).inc()
+
             
             app.logger.info(f"Job search initiated - job_title: {job_title}, location: {location}, page: {page}, user_id: {current_user.id if current_user.is_authenticated else None}")
             
@@ -263,10 +204,10 @@ def create_app():
                     page=page,
                     results_per_page=app.config['JOBS_PER_PAGE']  # Pagination limit from config
                 )
-                API_CALLS.labels(service='adzuna', status='success').inc()
+
                 app.logger.info(f"Adzuna API call successful - job_title: {job_title}, location: {location}, results_count: {search_results.get('count', 0)}")
             except Exception as e:
-                API_CALLS.labels(service='adzuna', status='error').inc()
+
                 app.logger.error(f"Adzuna API call failed - error: {str(e)}, job_title: {job_title}, location: {location}")
                 search_results = {'error': 'Failed to fetch jobs', 'results': []}
             
@@ -281,10 +222,10 @@ def create_app():
                         location=location,
                         job_results=search_results['results']
                     )
-                    API_CALLS.labels(service='azure_ai', status='success').inc()
+
                     app.logger.info(f"Azure AI analysis completed - job_title: {job_title}, location: {location}")
                 except Exception as e:
-                    API_CALLS.labels(service='azure_ai', status='error').inc()
+
                     app.logger.error(f"Azure AI analysis failed - error: {str(e)}, job_title: {job_title}, location: {location}")
             
             # Save search history for authenticated users only
@@ -301,7 +242,7 @@ def create_app():
                     db.session.add(search_history)
                     # Commit transaction to persist data
                     db.session.commit()
-                    DATABASE_OPERATIONS.labels(operation='insert', table='search_history').inc()
+
                     app.logger.info(f"Search history saved - user_id: {current_user.id}, job_title: {job_title}, location: {location}")
                 except Exception as e:
                     # Log error for debugging and monitoring

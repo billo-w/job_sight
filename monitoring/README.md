@@ -37,16 +37,17 @@ The monitoring system is built on multiple layers to provide complete visibility
 ### 2. Infrastructure Monitoring
 
 #### DigitalOcean App Platform Monitoring
-- **CPU Utilization**: Alert at 70% threshold
-- **Memory Utilization**: Alert at 80% threshold
+- **CPU Utilization**: Alert at 70% threshold (configured in app spec)
+- **Memory Utilization**: Alert at 80% threshold (configured in app spec)
 - **HTTP Status Codes**: Monitor 4xx and 5xx errors
 - **Deployment Failures**: Automatic alerting
+- **Health Checks**: Application health monitoring via `/health` endpoint
 
-#### Custom Infrastructure Alerts
-- **Response Time**: Alert when load exceeds 1.5
-- **Disk Usage**: Alert at 90% utilization
-- **Security Scans**: Monitor for vulnerabilities
-- **Uptime Checks**: Continuous availability monitoring
+#### Built-in Infrastructure Monitoring
+- **Resource Utilization**: CPU, memory, and disk monitoring
+- **Application Health**: Health check endpoint monitoring
+- **Deployment Status**: Automatic deployment failure detection
+- **Log Aggregation**: Centralized logging via Logtail
 
 ### 3. Business Intelligence Metrics
 

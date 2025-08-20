@@ -150,57 +150,6 @@ resource "digitalocean_project_resources" "project_resources" {
   ]
 }
 
-# Monitoring dashboard configuration
-resource "digitalocean_monitoring_alert" "high_cpu" {
-  name    = "High CPU Usage Alert"
-  type    = "v1/insights/droplet/cpu"
-  compare = "GreaterThan"
-  value   = 80
-  window  = "5m"
-  
-  tags = ["job-sight", "production"]
-  
-  notification {
-    email = [var.email]
-    slack {
-      channel = var.slack_channel
-      url     = var.slack_webhook_url
-    }
-  }
-}
-
-resource "digitalocean_monitoring_alert" "high_memory" {
-  name    = "High Memory Usage Alert"
-  type    = "v1/insights/droplet/memory_utilization_percent"
-  compare = "GreaterThan"
-  value   = 85
-  window  = "5m"
-  
-  tags = ["job-sight", "production"]
-  
-  notification {
-    email = [var.email]
-    slack {
-      channel = var.slack_channel
-      url     = var.slack_webhook_url
-    }
-  }
-}
-
-resource "digitalocean_monitoring_alert" "app_health" {
-  name    = "Application Health Check Alert"
-  type    = "v1/insights/droplet/load_1"
-  compare = "GreaterThan"
-  value   = 2.0
-  window  = "10m"
-  
-  tags = ["job-sight", "production"]
-  
-  notification {
-    email = [var.email]
-    slack {
-      channel = var.slack_channel
-      url     = var.slack_webhook_url
-    }
-  }
-}
+# Note: DigitalOcean App Platform has built-in monitoring and alerting
+# The monitoring configuration is handled through the app spec alerts
+# Custom monitoring alerts can be configured through the DigitalOcean dashboard

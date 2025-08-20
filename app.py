@@ -8,8 +8,13 @@ from flask_migrate import Migrate
 from urllib.parse import urlsplit
 # Import logging module for application monitoring and debugging
 import logging
+import structlog
+from pythonjsonlogger import jsonlogger
 # Import datetime for timestamp operations
 from datetime import datetime
+import time
+import os
+from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
 
 # Import local application modules
 from config import Config  # Application configuration class
@@ -18,12 +23,55 @@ from forms import RegistrationForm, LoginForm, JobSearchForm, SaveJobForm  # WTF
 from services.adzuna_api import AdzunaAPI  # External job search API service
 from services.azure_ai import AzureAIService  # Azure AI integration for job market analysis
 
+# Initialize Prometheus metrics
+REQUEST_COUNT = Counter('http_requests_total', 'Total HTTP requests', ['method', 'endpoint', 'status'])
+REQUEST_LATENCY = Histogram('http_request_duration_seconds', 'HTTP request latency')
+ACTIVE_USERS = Gauge('active_users', 'Number of active users')
+JOB_SEARCHES = Counter('job_searches_total', 'Total job searches', ['location', 'job_title'])
+API_CALLS = Counter('api_calls_total', 'Total API calls', ['service', 'status'])
+DATABASE_OPERATIONS = Counter('database_operations_total', 'Database operations', ['operation', 'table'])
+
+def setup_logging():
+    """Configure structured logging for production monitoring"""
+    # Configure structlog for structured logging
+    structlog.configure(
+        processors=[
+            structlog.stdlib.filter_by_level,
+            structlog.stdlib.add_logger_name,
+            structlog.stdlib.add_log_level,
+            structlog.stdlib.PositionalArgumentsFormatter(),
+            structlog.processors.TimeStamper(fmt="iso"),
+            structlog.processors.StackInfoRenderer(),
+            structlog.processors.format_exc_info,
+            structlog.processors.UnicodeDecoder(),
+            structlog.processors.JSONRenderer()
+        ],
+        context_class=dict,
+        logger_factory=structlog.stdlib.LoggerFactory(),
+        wrapper_class=structlog.stdlib.BoundLogger,
+        cache_logger_on_first_use=True,
+    )
+
+    # Configure root logger
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.INFO)
+    
+    # Add JSON formatter for structured logging
+    json_handler = logging.StreamHandler()
+    json_handler.setFormatter(jsonlogger.JsonFormatter(
+        fmt='%(timestamp)s %(level)s %(name)s %(message)s'
+    ))
+    root_logger.addHandler(json_handler)
+
 def create_app():
     """
     Application factory pattern implementation for Flask.
     This pattern allows for better testing, configuration management, and deployment flexibility.
     Returns a configured Flask application instance with all extensions initialized.
     """
+    # Setup structured logging
+    setup_logging()
+    
     # Create Flask application instance with current module name
     app = Flask(__name__)
     
@@ -63,11 +111,83 @@ def create_app():
     # This allows templates to use min() and max() functions directly
     app.jinja_env.globals.update(min=min, max=max)
     
-    # Configure application logging for production monitoring
-    if not app.debug:
-        # Set logging level to INFO for production error tracking
-        logging.basicConfig(level=logging.INFO)
-    
+    # Request monitoring middleware
+    @app.before_request
+    def before_request():
+        """Log request details and start timing"""
+        request.start_time = time.time()
+        app.logger.info(f"Request started - {request.method} {request.path} from {request.remote_addr}")
+
+    @app.after_request
+    def after_request(response):
+        """Log response details and record metrics"""
+        if hasattr(request, 'start_time'):
+            duration = time.time() - request.start_time
+            REQUEST_LATENCY.observe(duration)
+            
+            # Record request metrics
+            REQUEST_COUNT.labels(
+                method=request.method,
+                endpoint=request.endpoint or 'unknown',
+                status=response.status_code
+            ).inc()
+            
+            app.logger.info(f"Request completed - {request.method} {request.path} {response.status_code} ({duration:.3f}s)")
+        
+        return response
+
+    @app.errorhandler(404)
+    def not_found_error(error):
+        """Handle 404 errors with logging"""
+        app.logger.warning(f"Page not found - {request.path}")
+        return render_template('404.html'), 404
+
+    @app.errorhandler(500)
+    def internal_error(error):
+        """Handle 500 errors with logging and database rollback"""
+        app.logger.error(f"Internal server error - {str(error)} on {request.path}")
+        db.session.rollback()
+        return render_template('500.html'), 500
+
+    # Health check endpoint for monitoring
+    @app.route('/health')
+    def health_check():
+        """Health check endpoint for monitoring systems"""
+        try:
+            # Test database connection
+            db.session.execute(db.text('SELECT 1'))
+            db_status = 'healthy'
+        except Exception as e:
+            app.logger.error(f"Database health check failed: {str(e)}")
+            db_status = 'unhealthy'
+        
+        # Test external API connections
+        try:
+            adzuna_api = AdzunaAPI()
+            adzuna_status = 'healthy'
+        except Exception as e:
+            app.logger.error(f"Adzuna API health check failed: {str(e)}")
+            adzuna_status = 'unhealthy'
+        
+        health_status = {
+            'status': 'healthy' if all([db_status == 'healthy', adzuna_status == 'healthy']) else 'unhealthy',
+            'timestamp': datetime.utcnow().isoformat(),
+            'services': {
+                'database': db_status,
+                'adzuna_api': adzuna_status
+            },
+            'version': os.getenv('APP_VERSION', '1.0.0')
+        }
+        
+        status_code = 200 if health_status['status'] == 'healthy' else 503
+        return jsonify(health_status), status_code
+
+    # Metrics endpoint for Prometheus
+    @app.route('/metrics')
+    def metrics():
+        """Prometheus metrics endpoint"""
+        return generate_latest(), 200, {'Content-Type': CONTENT_TYPE_LATEST}
+
     # Define application routes using Flask decorators
     
     @app.route('/')
@@ -100,28 +220,64 @@ def create_app():
             # Get pagination parameter from URL query string, default to page 1
             page = request.args.get('page', 1, type=int)
             
+            # Record job search metrics
+            JOB_SEARCHES.labels(
+                location=location,
+                job_title=job_title
+            ).inc()
+            
+            app.logger.info("Job search initiated",
+                           job_title=job_title,
+                           location=location,
+                           page=page,
+                           user_id=current_user.id if current_user.is_authenticated else None)
+            
             # Initialize external service instances for API calls
             adzuna_api = AdzunaAPI()  # Job search API service
             azure_ai = AzureAIService()  # AI analysis service
             
             # Call Adzuna API to search for jobs with user parameters
-            search_results = adzuna_api.search_jobs(
-                job_title=job_title,
-                location=location,
-                page=page,
-                results_per_page=app.config['JOBS_PER_PAGE']  # Pagination limit from config
-            )
+            try:
+                search_results = adzuna_api.search_jobs(
+                    job_title=job_title,
+                    location=location,
+                    page=page,
+                    results_per_page=app.config['JOBS_PER_PAGE']  # Pagination limit from config
+                )
+                API_CALLS.labels(service='adzuna', status='success').inc()
+                app.logger.info("Adzuna API call successful",
+                               job_title=job_title,
+                               location=location,
+                               results_count=search_results.get('count', 0))
+            except Exception as e:
+                API_CALLS.labels(service='adzuna', status='error').inc()
+                app.logger.error("Adzuna API call failed",
+                                error=str(e),
+                                job_title=job_title,
+                                location=location)
+                search_results = {'error': 'Failed to fetch jobs', 'results': []}
             
             # Initialize AI summary variable
             ai_summary = None
             # Generate AI market analysis if search returned valid results
             if search_results.get('results') and not search_results.get('error'):
-                # Call Azure AI service to analyze job market trends
-                ai_summary = azure_ai.generate_job_market_summary(
-                    job_title=job_title,
-                    location=location,
-                    job_results=search_results['results']
-                )
+                try:
+                    # Call Azure AI service to analyze job market trends
+                    ai_summary = azure_ai.generate_job_market_summary(
+                        job_title=job_title,
+                        location=location,
+                        job_results=search_results['results']
+                    )
+                    API_CALLS.labels(service='azure_ai', status='success').inc()
+                    app.logger.info("Azure AI analysis completed",
+                                   job_title=job_title,
+                                   location=location)
+                except Exception as e:
+                    API_CALLS.labels(service='azure_ai', status='error').inc()
+                    app.logger.error("Azure AI analysis failed",
+                                    error=str(e),
+                                    job_title=job_title,
+                                    location=location)
             
             # Save search history for authenticated users only
             if current_user.is_authenticated:
@@ -137,9 +293,16 @@ def create_app():
                     db.session.add(search_history)
                     # Commit transaction to persist data
                     db.session.commit()
+                    DATABASE_OPERATIONS.labels(operation='insert', table='search_history').inc()
+                    app.logger.info("Search history saved",
+                                   user_id=current_user.id,
+                                   job_title=job_title,
+                                   location=location)
                 except Exception as e:
                     # Log error for debugging and monitoring
-                    app.logger.error(f"Failed to save search history: {str(e)}")
+                    app.logger.error("Failed to save search history",
+                                    error=str(e),
+                                    user_id=current_user.id)
                     # Rollback transaction to maintain database consistency
                     db.session.rollback()
             
@@ -167,6 +330,12 @@ def create_app():
             # Extract JSON data from POST request body
             job_data = request.get_json()
             
+            app.logger.info("Job save attempt",
+                           user_id=current_user.id,
+                           job_id=job_data.get('job_id'),
+                           job_title=job_data.get('job_title'),
+                           company=job_data.get('company'))
+            
             # Check if job is already saved by this user to prevent duplicates
             existing_job = SavedJob.query.filter_by(
                 user_id=current_user.id,
@@ -175,6 +344,9 @@ def create_app():
             
             # Return error response if job already exists
             if existing_job:
+                app.logger.info("Job already saved",
+                               user_id=current_user.id,
+                               job_id=job_data['job_id'])
                 return jsonify({'success': False, 'message': 'Job already saved'})
             
             # Create new SavedJob instance with job data
@@ -194,6 +366,14 @@ def create_app():
             db.session.add(saved_job)
             # Commit transaction to persist the saved job
             db.session.commit()
+            
+            # Record database operation metric
+            DATABASE_OPERATIONS.labels(operation='insert', table='saved_jobs').inc()
+            
+            app.logger.info("Job saved successfully",
+                           user_id=current_user.id,
+                           job_id=job_data['job_id'],
+                           job_title=job_data['job_title'])
             
             # Return success response for AJAX call
             return jsonify({'success': True, 'message': 'Job saved successfully'})
@@ -388,26 +568,6 @@ def create_app():
         return render_template('profile.html',
                              recent_searches=recent_searches,
                              saved_jobs_count=saved_jobs_count)
-
-    @app.errorhandler(404)
-    def not_found_error(error):
-        """
-        Custom 404 error handler for better user experience.
-        Returns custom error page instead of default Flask 404 page.
-        """
-        # Render custom 404 template with 404 status code
-        return render_template('errors/404.html'), 404
-
-    @app.errorhandler(500)
-    def internal_error(error):
-        """
-        Custom 500 error handler for server errors.
-        Rolls back database session and returns custom error page.
-        """
-        # Rollback any pending database transactions to prevent corruption
-        db.session.rollback()
-        # Render custom 500 template with 500 status code
-        return render_template('errors/500.html'), 500
     
     # Return configured Flask application instance
     return app

@@ -16,3 +16,7 @@ pytest==8.3.4
 pytest-flask==1.3.0
 pytest-cov==6.0.0
 coverage==7.6.9
+# Monitoring and metrics
+prometheus-client==0.20.0
+structlog==24.1.0
+python-json-logger==2.0.7

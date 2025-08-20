@@ -1,6 +1,10 @@
-# Environment variables
+# Environment variables and secrets
 .env
 .env.example
+.env.local
+.env.production
+.env.staging
+*.env
 
 # Python
 __pycache__/
@@ -31,13 +35,17 @@ env/
 ENV/
 env.bak/
 venv.bak/
+.venv/
 
-# IDE
+# IDE and editor files
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
+.project
+.classpath
+.settings/
 
 # Database
 *.db
@@ -49,9 +57,16 @@ env.py
 
 # Logs
 *.log
+logs/
+log/
 
-# OS
+# OS generated files
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
 
 # Flask
@@ -64,6 +79,64 @@ migrations/versions/
 # Temporary files
 *.tmp
 *.temp
+*.bak
+*.backup
 
-.terraform
+# Terraform
+.terraform/
 .terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+!example.tfvars
+!*.tfvars.example
+
+# Docker
+.dockerignore
+docker-compose.override.yml
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+.hypothesis/
+
+# Security and certificates
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+id_rsa*
+*.secret
+secrets/
+credentials/
+*token*
+*password*
+*credential*
+
+# Application specific
+uploads/
+media/
+staticfiles/
+node_modules/
+
+# Backup files
+*.orig
+*.rej
+*.old
+
+# Local development
+local_settings.py
+settings_local.py
+
+# Monitoring and metrics (if contains sensitive data)
+monitoring/local/
+monitoring/secrets/
+
+.cursor/

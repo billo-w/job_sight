@@ -53,6 +53,7 @@ resource "digitalocean_app" "app" {
         }
       }
 
+      # Enhanced logging configuration
       log_destination {
         name = "do_logtail"
         logtail {
@@ -60,6 +61,17 @@ resource "digitalocean_app" "app" {
         }
       }
 
+      # Health check configuration
+      health_check {
+        http_path = "/health"
+        initial_delay_seconds = 30
+        period_seconds = 60
+        timeout_seconds = 10
+        success_threshold = 1
+        failure_threshold = 3
+      }
+
+      # Service-level alerts
       alert {
         rule     = "CPU_UTILIZATION"
         value    = 70
@@ -67,13 +79,16 @@ resource "digitalocean_app" "app" {
         window   = "FIVE_MINUTES"
         disabled = false
       }
+      
       alert {
         rule     = "MEM_UTILIZATION"
-        value    = 70
+        value    = 80
         operator = "GREATER_THAN"
         window   = "FIVE_MINUTES"
         disabled = false
       }
+
+      # Environment variables for monitoring
       env {
         key   = "SECRET_KEY"
         value = var.secret_key
@@ -102,6 +117,19 @@ resource "digitalocean_app" "app" {
         key   = "AZURE_AI_KEY"
         value = var.azure_ai_key
       }
+      # Monitoring environment variables
+      env {
+        key   = "APP_VERSION"
+        value = "1.0.0"
+      }
+      env {
+        key   = "ENABLE_METRICS"
+        value = "true"
+      }
+      env {
+        key   = "LOG_LEVEL"
+        value = "INFO"
+      }
     }
   }
 
@@ -120,4 +148,59 @@ resource "digitalocean_project_resources" "project_resources" {
   depends_on = [
     digitalocean_app.app
   ]
+}
+
+# Monitoring dashboard configuration
+resource "digitalocean_monitoring_alert" "high_cpu" {
+  name    = "High CPU Usage Alert"
+  type    = "v1/insights/droplet/cpu"
+  compare = "GreaterThan"
+  value   = 80
+  window  = "5m"
+  
+  tags = ["job-sight", "production"]
+  
+  notification {
+    email = [var.email]
+    slack {
+      channel = var.slack_channel
+      url     = var.slack_webhook_url
+    }
+  }
+}
+
+resource "digitalocean_monitoring_alert" "high_memory" {
+  name    = "High Memory Usage Alert"
+  type    = "v1/insights/droplet/memory_utilization_percent"
+  compare = "GreaterThan"
+  value   = 85
+  window  = "5m"
+  
+  tags = ["job-sight", "production"]
+  
+  notification {
+    email = [var.email]
+    slack {
+      channel = var.slack_channel
+      url     = var.slack_webhook_url
+    }
+  }
+}
+
+resource "digitalocean_monitoring_alert" "app_health" {
+  name    = "Application Health Check Alert"
+  type    = "v1/insights/droplet/load_1"
+  compare = "GreaterThan"
+  value   = 2.0
+  window  = "10m"
+  
+  tags = ["job-sight", "production"]
+  
+  notification {
+    email = [var.email]
+    slack {
+      channel = var.slack_channel
+      url     = var.slack_webhook_url
+    }
+  }
 }

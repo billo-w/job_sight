@@ -275,16 +275,8 @@ resource "digitalocean_app" "app" {
   }
 }
 
-# Add project resources after app creation to avoid dependency issues
-resource "digitalocean_project_resources" "project_resources" {
-  project = digitalocean_project.project.id
-  resources = var.flask_env == "production" ? digitalocean_app.app[*].urn : digitalocean_app.testing_app[*].urn
-  
-  depends_on = [
-    digitalocean_app.app,
-    digitalocean_app.testing_app
-  ]
-}
+# Project resources assignment removed to avoid conflicts
+# Apps will be manually added to the project if needed
 
 # Note: DigitalOcean App Platform has built-in monitoring and alerting
 # The monitoring configuration is handled through the app spec alerts

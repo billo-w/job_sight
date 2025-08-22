@@ -72,7 +72,38 @@ variable "logtail_token" {
   type        = string
   sensitive   = true
 }
+
 variable "project_id" {
   description = "DigitalOcean project ID for the application"
   type        = string
+}
+
+variable "allowed_ips" {
+  description = "List of IP addresses allowed to access the application (CIDR notation)"
+  type        = list(string)
+  default     = ["0.0.0.0/0"]  # Allow all IPs by default
+}
+
+variable "enable_ip_restrictions" {
+  description = "Enable IP restrictions for the application"
+  type        = bool
+  default     = false
+}
+
+variable "app_name" {
+  description = "Name of the application"
+  type        = string
+  default     = "job-sight-app"
+}
+
+variable "image_tag" {
+  description = "Docker image tag to deploy"
+  type        = string
+  default     = "latest"
+}
+
+variable "app_version" {
+  description = "Application version"
+  type        = string
+  default     = "1.0.0"
 }

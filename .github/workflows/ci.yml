@@ -55,8 +55,7 @@ jobs:
           import sys
           sys.path.insert(0, '.')
           try:
-              from app import create_app
-              app = create_app()
+              from app import app
               print('✅ Flask app can be imported and created successfully')
           except Exception as e:
               print(f'❌ Flask app failed to start: {e}')
@@ -95,7 +94,7 @@ jobs:
             trivy-results.sarif
           retention-days: 30
 
-  deploy:
+  deploy-production:
     needs: build-and-test
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
@@ -115,6 +114,12 @@ jobs:
       TF_VAR_slack_webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
       TF_VAR_logtail_token:  ${{ secrets.LOGTAIL_TOKEN }}
       TF_VAR_project_id:   ${{ secrets.DO_PROJECT_ID }}
+      # Production settings - no IP restrictions
+      TF_VAR_app_name:      "job-sight-app"
+      TF_VAR_image_tag:     "latest"
+      TF_VAR_app_version:   "1.0.0"
+      TF_VAR_enable_ip_restrictions: "false"
+      TF_VAR_allowed_ips:   '["0.0.0.0/0"]'
       AWS_ACCESS_KEY_ID:     ${{ secrets.SPACES_ACCESS_KEY }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.SPACES_SECRET_KEY }}
     steps:
@@ -197,3 +202,104 @@ jobs:
           }
           
           retry_terraform_apply
+
+  deploy-testing:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    if: github.ref != 'refs/heads/main' && github.event_name == 'push'
+    env:
+      # DO App Platform vars
+      TF_VAR_do_token:       ${{ secrets.DO_TOKEN }}
+      TF_VAR_github_repo:    ${{ github.repository }}
+      TF_VAR_secret_key:     ${{ secrets.SECRET_KEY }}
+      TF_VAR_flask_env:      "testing"
+      TF_VAR_database_url:   ${{ secrets.DATABASE_URL }}
+      TF_VAR_adzuna_app_id:  ${{ secrets.ADZUNA_APP_ID }}
+      TF_VAR_adzuna_app_key: ${{ secrets.ADZUNA_APP_KEY }}
+      TF_VAR_azure_ai_endpoint: ${{ secrets.AZURE_AI_ENDPOINT }}
+      TF_VAR_azure_ai_key:      ${{ secrets.AZURE_AI_KEY }}
+      TF_VAR_email:         ${{ secrets.ALERT_EMAIL }}
+      TF_VAR_slack_channel:  ${{ secrets.SLACK_CHANNEL }}
+      TF_VAR_slack_webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+      TF_VAR_logtail_token:  ${{ secrets.LOGTAIL_TOKEN }}
+      TF_VAR_project_id:   ${{ secrets.DO_PROJECT_ID }}
+      # Testing settings - with IP restrictions
+      TF_VAR_app_name:      "job-sight-test-${{ github.ref_name }}"
+      TF_VAR_image_tag:     "${{ github.sha }}"
+      TF_VAR_app_version:   "${{ github.ref_name }}"
+      TF_VAR_enable_ip_restrictions: "true"
+      TF_VAR_allowed_ips:   '["${{ secrets.TESTING_ALLOWED_IPS }}"]'
+      AWS_ACCESS_KEY_ID:     ${{ secrets.SPACES_ACCESS_KEY }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.SPACES_SECRET_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Build Docker image for testing
+        run: |
+          docker build -t job-sight:${{ github.sha }} .
+          
+      - name: Security scan with Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: job-sight:${{ github.sha }}
+          exit-code: '1'
+          ignore-unfixed: true
+          severity: 'CRITICAL,HIGH'
+          
+      - name: Log in to DigitalOcean Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: registry.digitalocean.com
+          username: doctl
+          password: ${{ secrets.DO_TOKEN }}
+          
+      - name: Tag and push Docker image to DigitalOcean Container Registry
+        run: |
+          docker tag job-sight:${{ github.sha }} registry.digitalocean.com/job-sight-app/job-sight:${{ github.sha }}
+          docker push registry.digitalocean.com/job-sight-app/job-sight:${{ github.sha }}
+
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: '1.12.0'
+
+      - name: Terraform Init
+        working-directory: terraform
+        run: |
+          terraform init -reconfigure -upgrade
+          
+      - name: Terraform Validate
+        working-directory: terraform
+        run: terraform validate
+
+      - name: Terraform Plan
+        working-directory: terraform
+        run: |
+          terraform plan -out=tfplan -detailed-exitcode
+        continue-on-error: false
+
+      - name: Terraform Apply Testing Environment
+        working-directory: terraform
+        run: |
+          terraform apply -auto-approve tfplan
+
+  cleanup-testing:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'delete' || (github.ref == 'refs/heads/main' && github.event_name == 'push')
+    env:
+      TF_VAR_do_token: ${{ secrets.DO_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: '1.12.0'
+
+      - name: Cleanup Testing Environments
+        run: |
+          # This would need to be implemented based on your specific needs
+          # For now, we'll just log that cleanup is needed
+          echo "Testing environment cleanup would happen here"
+          echo "For feature branches, you might want to destroy the testing environment"
+          echo "This could be done by maintaining a list of testing environments and destroying them"

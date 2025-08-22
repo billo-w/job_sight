@@ -31,7 +31,7 @@ resource "digitalocean_app" "app" {
   depends_on = [digitalocean_container_registry.app_registry]
 
   spec {
-    name   = "job-sight-app"
+    name   = var.app_name
     region = "lon"
 
     alert {
@@ -47,7 +47,7 @@ resource "digitalocean_app" "app" {
       image {
         registry_type = "DOCR"
         repository    = "job-sight"
-        tag           = "latest"
+        tag           = var.image_tag
         deploy_on_push {
           enabled = true
         }
@@ -120,7 +120,7 @@ resource "digitalocean_app" "app" {
       # Monitoring environment variables
       env {
         key   = "APP_VERSION"
-        value = "1.0.0"
+        value = var.app_version
       }
       env {
         key   = "ENABLE_METRICS"
@@ -130,6 +130,16 @@ resource "digitalocean_app" "app" {
         key   = "LOG_LEVEL"
         value = "INFO"
       }
+    }
+
+    # Environment variable to enable IP restrictions for testing
+    env {
+      key   = "ENABLE_IP_RESTRICTIONS"
+      value = var.enable_ip_restrictions ? "true" : "false"
+    }
+    env {
+      key   = "ALLOWED_IPS"
+      value = join(",", var.allowed_ips)
     }
   }
 

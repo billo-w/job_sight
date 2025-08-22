@@ -3,62 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Job Sight - Recruiter Job Search{% endblock %}</title>
-    
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Custom CSS -->
-    <style>
-        .gradient-bg {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        }
-        .card-hover {
-            transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
-        }
-        .card-hover:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
-        }
-    </style>
-    
+    <title>{% block title %}Job Sight{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
     {% block extra_head %}{% endblock %}
 </head>
-<body class="bg-gray-50 min-h-screen">
+<body>
     <!-- Navigation -->
-    <nav class="gradient-bg shadow-lg">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between h-16">
-                <div class="flex items-center">
-                    <a href="{{ url_for('index') }}" class="flex items-center">
-                        <svg class="h-8 w-8 text-white mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-                        </svg>
-                        <span class="text-white text-xl font-bold">Job Sight</span>
-                    </a>
-                </div>
-                
-                <div class="flex items-center space-x-4">
-                    {% if current_user.is_authenticated %}
-                        <a href="{{ url_for('saved_jobs') }}" class="text-white hover:text-gray-200 px-3 py-2 rounded-md text-sm font-medium transition duration-150">
-                            Saved Jobs
-                        </a>
-                        <a href="{{ url_for('profile') }}" class="text-white hover:text-gray-200 px-3 py-2 rounded-md text-sm font-medium transition duration-150">
-                            Profile
-                        </a>
-                        <a href="{{ url_for('logout') }}" class="bg-white text-purple-600 hover:bg-gray-100 px-4 py-2 rounded-md text-sm font-medium transition duration-150">
-                            Logout
-                        </a>
-                        <span class="text-white text-sm">Welcome, {{ current_user.first_name }}!</span>
-                    {% else %}
-                        <a href="{{ url_for('login') }}" class="text-white hover:text-gray-200 px-3 py-2 rounded-md text-sm font-medium transition duration-150">
-                            Login
-                        </a>
-                        <a href="{{ url_for('register') }}" class="bg-white text-purple-600 hover:bg-gray-100 px-4 py-2 rounded-md text-sm font-medium transition duration-150">
-                            Register
-                        </a>
-                    {% endif %}
-                </div>
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <a href="{{ url_for('index') }}" class="brand-link">Job Sight</a>
+            </div>
+            <div class="nav-menu">
+                {% if current_user.is_authenticated %}
+                    <a href="{{ url_for('saved_jobs') }}" class="nav-link">Saved Jobs</a>
+                    <a href="{{ url_for('profile') }}" class="nav-link">Profile</a>
+                    <a href="{{ url_for('logout') }}" class="nav-link">Logout</a>
+                {% else %}
+                    <a href="{{ url_for('login') }}" class="nav-link">Login</a>
+                    <a href="{{ url_for('register') }}" class="nav-link">Register</a>
+                {% endif %}
             </div>
         </div>
     </nav>
@@ -66,29 +30,10 @@
     <!-- Flash Messages -->
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4">
+            <div class="flash-messages">
                 {% for category, message in messages %}
-                    <div class="alert alert-{{ category }} mb-4 p-4 rounded-md {% if category == 'error' %}bg-red-100 border border-red-400 text-red-700{% elif category == 'success' %}bg-green-100 border border-green-400 text-green-700{% elif category == 'info' %}bg-blue-100 border border-blue-400 text-blue-700{% else %}bg-yellow-100 border border-yellow-400 text-yellow-700{% endif %}">
-                        <div class="flex">
-                            <div class="flex-shrink-0">
-                                {% if category == 'error' %}
-                                    <svg class="h-5 w-5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
-                                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
-                                    </svg>
-                                {% elif category == 'success' %}
-                                    <svg class="h-5 w-5 text-green-400" fill="currentColor" viewBox="0 0 20 20">
-                                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
-                                    </svg>
-                                {% else %}
-                                    <svg class="h-5 w-5 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
-                                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
-                                    </svg>
-                                {% endif %}
-                            </div>
-                            <div class="ml-3">
-                                <p class="text-sm font-medium">{{ message }}</p>
-                            </div>
-                        </div>
+                    <div class="flash-message flash-{{ category }}">
+                        {{ message }}
                     </div>
                 {% endfor %}
             </div>
@@ -96,57 +41,17 @@
     {% endwith %}
 
     <!-- Main Content -->
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <main class="main-content">
         {% block content %}{% endblock %}
     </main>
 
     <!-- Footer -->
-    <footer class="bg-gray-800 text-white mt-16">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-                <div>
-                    <h3 class="text-lg font-semibold mb-4">Job Sight</h3>
-                    <p class="text-gray-300">Empowering recruiters with intelligent job search and market insights.</p>
-                </div>
-                <div>
-                    <h3 class="text-lg font-semibold mb-4">Features</h3>
-                    <ul class="text-gray-300 space-y-2">
-                        <li>AI-Powered Market Analysis</li>
-                        <li>Real-time Job Search</li>
-                        <li>Save & Manage Jobs</li>
-                        <li>Recruitment Insights</li>
-                    </ul>
-                </div>
-                <div>
-                    <h3 class="text-lg font-semibold mb-4">Powered By</h3>
-                    <ul class="text-gray-300 space-y-2">
-                        <li>Adzuna Jobs API</li>
-                        <li>Azure AI Foundry</li>
-                        <li>GPT-4o</li>
-                    </ul>
-                </div>
-            </div>
-            <div class="border-t border-gray-700 mt-8 pt-8 text-center text-gray-300">
-                <p>&copy; 2025 Job Sight. Built for recruiters, by recruiters.</p>
-            </div>
+    <footer class="footer">
+        <div class="footer-content">
+            <p>&copy; 2024 Job Sight. Simplified job search for recruiters.</p>
         </div>
     </footer>
 
-    <!-- JavaScript -->
-    <script>
-        // Auto-hide flash messages after 5 seconds
-        setTimeout(function() {
-            const alerts = document.querySelectorAll('.alert');
-            alerts.forEach(function(alert) {
-                alert.style.transition = 'opacity 0.5s ease-out';
-                alert.style.opacity = '0';
-                setTimeout(function() {
-                    alert.remove();
-                }, 500);
-            });
-        }, 5000);
-    </script>
-    
     {% block extra_js %}{% endblock %}
 </body>
 </html>

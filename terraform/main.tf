@@ -49,7 +49,7 @@ resource "digitalocean_app" "app" {
         repository    = "job-sight"
         tag           = var.image_tag
         deploy_on_push {
-          enabled = true
+          enabled = var.flask_env == "testing"
         }
       }
 
@@ -130,12 +130,15 @@ resource "digitalocean_app" "app" {
         key   = "LOG_LEVEL"
         value = "INFO"
       }
-    }
-
-    # Environment variable to enable IP restrictions for testing
-    env {
-      key   = "ENABLE_IP_RESTRICTIONS"
-      value = var.enable_ip_restrictions ? "true" : "false"
+      # IP restriction environment variables
+      env {
+        key   = "ENABLE_IP_RESTRICTIONS"
+        value = var.enable_ip_restrictions ? "true" : "false"
+      }
+      env {
+        key   = "ALLOWED_IPS"
+        value = join(",", var.allowed_ips)
+      }
     }
     env {
       key   = "ALLOWED_IPS"

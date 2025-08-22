@@ -279,13 +279,15 @@ jobs:
       - name: Terraform Plan
         working-directory: terraform
         run: |
-          terraform plan -out=tfplan -detailed-exitcode -var="app_name=${{ env.TF_VAR_app_name }}"
+          export TF_VAR_app_name=${{ env.TF_VAR_app_name }}
+          terraform plan -out=tfplan -detailed-exitcode
         continue-on-error: false
 
       - name: Terraform Apply Testing Environment
         working-directory: terraform
         run: |
-          terraform apply -auto-approve tfplan -var="app_name=${{ env.TF_VAR_app_name }}"
+          export TF_VAR_app_name=${{ env.TF_VAR_app_name }}
+          terraform apply -auto-approve tfplan
 
   cleanup-testing:
     runs-on: ubuntu-latest

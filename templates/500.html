@@ -1,20 +1,22 @@
 {% extends "base.html" %}
 
-{% block title %}Internal Server Error{% endblock %}
+{% block title %}Server Error - Job Sight{% endblock %}
 
 {% block content %}
-<div class="container mt-5">
-    <div class="row justify-content-center">
-        <div class="col-md-8">
-            <div class="card">
-                <div class="card-body text-center">
-                    <h1 class="display-1 text-danger">500</h1>
-                    <h2 class="card-title">Internal Server Error</h2>
-                    <p class="card-text">Something went wrong on our end. Please try again later.</p>
-                    <a href="{{ url_for('index') }}" class="btn btn-primary">Go Home</a>
-                </div>
-            </div>
-        </div>
+<div style="text-align: center; padding: 4rem 0;">
+    <div style="width: 8rem; height: 8rem; background: #fef2f2; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 2rem;">
+        <svg width="64" height="64" fill="none" stroke="#ef4444" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+        </svg>
+    </div>
+    <h1 style="font-size: 3rem; font-weight: bold; margin-bottom: 1rem;">500</h1>
+    <h2 style="font-size: 1.5rem; margin-bottom: 1rem;">Server Error</h2>
+    <p style="color: #666; margin-bottom: 2rem; max-width: 500px; margin-left: auto; margin-right: auto;">
+        Something went wrong on our end. We're working to fix this issue. Please try again later.
+    </p>
+    <div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
+        <a href="{{ url_for('index') }}" class="btn btn-primary">Go Home</a>
+        <a href="javascript:location.reload()" class="btn btn-secondary">Try Again</a>
     </div>
 </div>
 {% endblock %}

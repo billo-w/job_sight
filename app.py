@@ -1,533 +1,481 @@
-# Import Flask core components for web application functionality
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session
-# Import Flask-Login components for user session management and authentication
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
-# Import Flask-Migrate for database schema version control and migrations
-from flask_migrate import Migrate
-
-# Import Flask-Limiter for rate limiting
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
-# Import URL parsing utilities for secure redirect validation
-from urllib.parse import urlsplit
-# Import logging module for application monitoring and debugging
-import logging
-import structlog
-from pythonjsonlogger import jsonlogger
-# Import datetime for timestamp operations
+from flask_sqlalchemy import SQLAlchemy
+from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
-import time
+import requests
 import os
+from dotenv import load_dotenv
 
+# Load environment variables
+load_dotenv()
 
-# Import local application modules
-from config import Config  # Application configuration class
-from models import db, User, SavedJob, SearchHistory  # Database models and SQLAlchemy instance
-from forms import RegistrationForm, LoginForm, JobSearchForm, SaveJobForm  # WTForms form classes
-from services.adzuna_api import AdzunaAPI  # External job search API service
-from services.azure_ai import AzureAIService  # Azure AI integration for job market analysis
+# Create Flask app
+app = Flask(__name__)
 
+# Add startup logging
+print("Starting Job Sight application...")
+print(f"Environment: {os.environ.get('FLASK_ENV', 'unknown')}")
+print(f"Database URL: {os.environ.get('DATABASE_URL', 'not set')[:20]}...")
 
-
-def setup_logging():
-    """Configure structured logging for production monitoring"""
-    # Configure structlog for structured logging
-    structlog.configure(
-        processors=[
-            structlog.stdlib.filter_by_level,
-            structlog.stdlib.add_logger_name,
-            structlog.stdlib.add_log_level,
-            structlog.stdlib.PositionalArgumentsFormatter(),
-            structlog.processors.TimeStamper(fmt="iso"),
-            structlog.processors.StackInfoRenderer(),
-            structlog.processors.format_exc_info,
-            structlog.processors.UnicodeDecoder(),
-            structlog.processors.JSONRenderer()
-        ],
-        context_class=dict,
-        logger_factory=structlog.stdlib.LoggerFactory(),
-        wrapper_class=structlog.stdlib.BoundLogger,
-        cache_logger_on_first_use=True,
-    )
-
-    # Configure root logger
-    root_logger = logging.getLogger()
-    root_logger.setLevel(logging.INFO)
+# IP Restriction functionality
+def check_ip_restriction():
+    """Check if IP restrictions are enabled and if current IP is allowed"""
+    if not os.environ.get('ENABLE_IP_RESTRICTIONS', 'false').lower() == 'true':
+        return True  # No restrictions enabled
     
-    # Add JSON formatter for structured logging
-    json_handler = logging.StreamHandler()
-    json_handler.setFormatter(jsonlogger.JsonFormatter(
-        fmt='%(timestamp)s %(level)s %(name)s %(message)s'
-    ))
-    root_logger.addHandler(json_handler)
-
-def create_app():
-    """
-    Application factory pattern implementation for Flask.
-    This pattern allows for better testing, configuration management, and deployment flexibility.
-    Returns a configured Flask application instance with all extensions initialized.
-    """
-    # Setup structured logging
-    setup_logging()
+    allowed_ips = os.environ.get('ALLOWED_IPS', '').split(',')
+    if not allowed_ips or allowed_ips == ['']:
+        return True  # No IPs specified, allow all
     
-    # Create Flask application instance with current module name
-    app = Flask(__name__)
-    
-    # Load configuration from Config class - centralizes all app settings
-    app.config.from_object(Config)
-    
-
-    
-    # Initialize Flask-Limiter for rate limiting
-    limiter = Limiter(
-        app=app,
-        key_func=get_remote_address,
-        default_limits=["200 per day", "50 per hour"]
-    )
-    
-    # Initialize SQLAlchemy database extension with the app instance
-    # This creates the database connection pool and ORM functionality
-    db.init_app(app)
-    
-    # Initialize Flask-Migrate for database schema version control
-    # Enables database migrations for schema changes in production
-    migrate = Migrate(app, db)
-    
-    # Initialize Flask-Login extension for user session management
-    login_manager = LoginManager()
-    # Bind the login manager to the Flask application
-    login_manager.init_app(app)
-    # Set the login view route for redirecting unauthenticated users
-    login_manager.login_view = 'login'
-    # Set flash message for login requirement
-    login_manager.login_message = 'Please log in to access this page.'
-    # Set flash message category for styling purposes
-    login_manager.login_message_category = 'info'
-    
-    @login_manager.user_loader
-    def load_user(user_id):
-        """
-        User loader callback for Flask-Login.
-        This function is called to reload the user object from the user ID stored in the session.
-        Required by Flask-Login to manage user sessions across requests.
-        """
-        # Query database for user by ID and return User object or None
-        return User.query.get(int(user_id))
-    
-    # Add Python built-in functions to Jinja2 template environment
-    # This allows templates to use min() and max() functions directly
-    app.jinja_env.globals.update(min=min, max=max)
-    
-    # Request monitoring middleware
-    @app.before_request
-    def before_request():
-        """Log request details and start timing"""
-        request.start_time = time.time()
-        app.logger.info(f"Request started - {request.method} {request.path} from {request.remote_addr}")
-
-    @app.after_request
-    def after_request(response):
-        """Log response details, record metrics, and add security headers"""
-        if hasattr(request, 'start_time'):
-            duration = time.time() - request.start_time
-            app.logger.info(f"Request completed - {request.method} {request.path} {response.status_code} ({duration:.3f}s)")
-        
-        # Add security headers (CSP temporarily disabled for development)
-        response.headers['X-Content-Type-Options'] = 'nosniff'
-        response.headers['X-Frame-Options'] = 'DENY'
-        response.headers['X-XSS-Protection'] = '1; mode=block'
-        response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
-        # response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdn.tailwindcss.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdn.tailwindcss.com; font-src 'self' https://cdn.jsdelivr.net https://cdn.tailwindcss.com; img-src 'self' data: https:; connect-src 'self' https://cdn.tailwindcss.com;"
-        
-        return response
-
-    @app.errorhandler(404)
-    def not_found_error(error):
-        """Handle 404 errors with logging"""
-        app.logger.warning(f"Page not found - {request.path}")
-        return render_template('404.html'), 404
-
-    @app.errorhandler(500)
-    def internal_error(error):
-        """Handle 500 errors with logging and database rollback"""
-        app.logger.error(f"Internal server error - {str(error)} on {request.path}")
-        db.session.rollback()
-        return render_template('500.html'), 500
-
-
-
-    # Define application routes using Flask decorators
-    
-    @app.route('/')
-    def index():
-        """
-        Home page route handler.
-        Displays the main job search interface with an empty search form.
-        This is the application entry point for users.
-        """
-        # Create an instance of the job search form for the template
-        form = JobSearchForm()
-        # Render the home page template with the search form
-        return render_template('index.html', form=form)
-
-    @app.route('/search', methods=['GET', 'POST'])
-    def search_jobs():
-        """
-        Job search route handler supporting both GET and POST methods.
-        Processes job search requests, integrates with Adzuna API,
-        generates AI summaries, and saves search history for authenticated users.
-        """
-        # Create form instance for validation and data extraction
-        form = JobSearchForm()
-        
-        # Check if form was submitted and passes validation
-        if form.validate_on_submit():
-            # Extract and clean form data to prevent injection attacks
-            job_title = form.job_title.data.strip()
-            location = form.location.data.strip()
-            # Get pagination parameter from URL query string, default to page 1
-            page = request.args.get('page', 1, type=int)
-            
-
-            
-            app.logger.info(f"Job search initiated - job_title: {job_title}, location: {location}, page: {page}, user_id: {current_user.id if current_user.is_authenticated else None}")
-            
-            # Initialize external service instances for API calls
-            adzuna_api = AdzunaAPI()  # Job search API service
-            azure_ai = AzureAIService()  # AI analysis service
-            
-            # Call Adzuna API to search for jobs with user parameters
+    client_ip = request.remote_addr
+    # Check if client IP is in allowed list
+    for allowed_ip in allowed_ips:
+        allowed_ip = allowed_ip.strip()
+        if allowed_ip == client_ip or allowed_ip == '0.0.0.0/0':
+            return True
+        # Simple CIDR check (for basic ranges like 192.168.1.0/24)
+        if '/' in allowed_ip:
             try:
-                search_results = adzuna_api.search_jobs(
-                    job_title=job_title,
-                    location=location,
-                    page=page,
-                    results_per_page=app.config['JOBS_PER_PAGE']  # Pagination limit from config
-                )
+                import ipaddress
+                if ipaddress.ip_address(client_ip) in ipaddress.ip_network(allowed_ip):
+                    return True
+            except:
+                pass
+    
+    return False
 
-                app.logger.info(f"Adzuna API call successful - job_title: {job_title}, location: {location}, results_count: {search_results.get('count', 0)}")
-            except Exception as e:
+@app.before_request
+def before_request():
+    """Check IP restrictions before processing any request"""
+    # Skip IP restriction check for health endpoint
+    if request.endpoint == 'health_check':
+        return
+    
+    if not check_ip_restriction():
+        return jsonify({'error': 'Access denied. Your IP is not authorized to access this environment.'}), 403
 
-                app.logger.error(f"Adzuna API call failed - error: {str(e)}, job_title: {job_title}, location: {location}")
-                search_results = {'error': 'Failed to fetch jobs', 'results': []}
-            
-            # Initialize AI summary variable
-            ai_summary = None
-            # Generate AI market analysis if search returned valid results
-            if search_results.get('results') and not search_results.get('error'):
-                try:
-                    # Call Azure AI service to analyze job market trends
-                    ai_summary = azure_ai.generate_job_market_summary(
-                        job_title=job_title,
-                        location=location,
-                        job_results=search_results['results']
-                    )
+# Basic configuration
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///job_sight.db')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-                    app.logger.info(f"Azure AI analysis completed - job_title: {job_title}, location: {location}")
-                except Exception as e:
+# Initialize extensions
+db = SQLAlchemy(app)
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login'
 
-                    app.logger.error(f"Azure AI analysis failed - error: {str(e)}, job_title: {job_title}, location: {location}")
-            
-            # Save search history for authenticated users only
-            if current_user.is_authenticated:
-                try:
-                    # Create new search history record
-                    search_history = SearchHistory(
-                        user_id=current_user.id,  # Link to current user
-                        job_title=job_title,
-                        location=location,
-                        results_count=search_results.get('count', 0)  # Number of results found
-                    )
-                    # Add record to database session
-                    db.session.add(search_history)
-                    # Commit transaction to persist data
-                    db.session.commit()
+# Database Models
+class User(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    password_hash = db.Column(db.String(255), nullable=False)
+    first_name = db.Column(db.String(50), nullable=False)
+    last_name = db.Column(db.String(50), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    saved_jobs = db.relationship('SavedJob', backref='user', lazy=True, cascade='all, delete-orphan')
 
-                    app.logger.info(f"Search history saved - user_id: {current_user.id}, job_title: {job_title}, location: {location}")
-                except Exception as e:
-                    # Log error for debugging and monitoring
-                    app.logger.error(f"Failed to save search history - error: {str(e)}, user_id: {current_user.id}")
-                    # Rollback transaction to maintain database consistency
-                    db.session.rollback()
-            
-            # Render results page with search data and AI analysis
-            return render_template('results.html',
-                                 form=form,
-                                 search_results=search_results,
-                                 ai_summary=ai_summary,
-                                 job_title=job_title,
-                                 location=location,
-                                 page=page)
-        
-        # If form validation fails, redirect back to home page with form errors
-        return render_template('index.html', form=form)
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
 
-    @app.route('/save_job', methods=['POST'])
-    @login_required  # Decorator ensures only authenticated users can access this route
-    def save_job():
-        """
-        AJAX endpoint for saving jobs to user's saved jobs list.
-        Accepts JSON data, validates job doesn't already exist,
-        and creates new SavedJob record in database.
-        """
+    def check_password(self, password):
+        return check_password_hash(self.password_hash, password)
+
+    def is_authenticated(self):
+        return True
+
+    def is_active(self):
+        return True
+
+    def is_anonymous(self):
+        return False
+
+    def get_id(self):
+        return str(self.id)
+
+class SavedJob(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    job_id = db.Column(db.String(100), nullable=False)
+    job_title = db.Column(db.String(255), nullable=False)
+    company = db.Column(db.String(255), nullable=False)
+    location = db.Column(db.String(255), nullable=False)
+    salary_min = db.Column(db.Numeric(10, 2), nullable=True)
+    salary_max = db.Column(db.Numeric(10, 2), nullable=True)
+    job_url = db.Column(db.Text, nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    saved_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    __table_args__ = (db.UniqueConstraint('user_id', 'job_id', name='unique_user_job'),)
+
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id))
+
+# Simple API Services
+class JobAPI:
+    def __init__(self):
+        self.app_id = os.environ.get('ADZUNA_APP_ID')
+        self.app_key = os.environ.get('ADZUNA_APP_KEY')
+        self.base_url = 'https://api.adzuna.com/v1/api/jobs'
+
+    def search_jobs(self, job_title, location, page=1):
+        if not all([self.app_id, self.app_key]):
+            return {'error': 'API credentials not configured', 'results': [], 'count': 0}
+
         try:
-            # Extract JSON data from POST request body
-            job_data = request.get_json()
+            url = f"{self.base_url}/gb/search/{page}"
+            params = {
+                'app_id': self.app_id,
+                'app_key': self.app_key,
+                'what': job_title,
+                'where': location,
+                'results_per_page': 20,
+                'sort_by': 'relevance'
+            }
             
-            app.logger.info("Job save attempt",
-                           user_id=current_user.id,
-                           job_id=job_data.get('job_id'),
-                           job_title=job_data.get('job_title'),
-                           company=job_data.get('company'))
+            response = requests.get(url, params=params, timeout=10)
+            response.raise_for_status()
+            data = response.json()
             
-            # Check if job is already saved by this user to prevent duplicates
-            existing_job = SavedJob.query.filter_by(
-                user_id=current_user.id,
-                job_id=job_data['job_id']
-            ).first()
+            formatted_jobs = []
+            for job in data.get('results', []):
+                formatted_job = {
+                    'id': job.get('id', ''),
+                    'title': job.get('title', 'No title'),
+                    'company': job.get('company', {}).get('display_name', 'Unknown Company'),
+                    'location': job.get('location', {}).get('display_name', 'Unknown Location'),
+                    'description': job.get('description', 'No description'),
+                    'salary_min': job.get('salary_min'),
+                    'salary_max': job.get('salary_max'),
+                    'redirect_url': job.get('redirect_url', ''),
+                    'created': job.get('created', '')
+                }
+                formatted_jobs.append(formatted_job)
             
-            # Return error response if job already exists
-            if existing_job:
-                app.logger.info("Job already saved",
-                               user_id=current_user.id,
-                               job_id=job_data['job_id'])
-                return jsonify({'success': False, 'message': 'Job already saved'})
-            
-            # Create new SavedJob instance with job data
-            saved_job = SavedJob(
-                user_id=current_user.id,  # Link to current authenticated user
-                job_id=job_data['job_id'],  # External job ID from Adzuna
-                job_title=job_data['job_title'],
-                company=job_data['company'],
-                location=job_data['location'],
-                salary_min=job_data.get('salary_min'),  # Optional field
-                salary_max=job_data.get('salary_max'),  # Optional field
-                job_url=job_data['job_url'],
-                description=job_data.get('description', '')  # Default to empty string
-            )
-            
-            # Add new record to database session
-            db.session.add(saved_job)
-            # Commit transaction to persist the saved job
-            db.session.commit()
-            
-            # Record database operation metric
-            DATABASE_OPERATIONS.labels(operation='insert', table='saved_jobs').inc()
-            
-            app.logger.info("Job saved successfully",
-                           user_id=current_user.id,
-                           job_id=job_data['job_id'],
-                           job_title=job_data['job_title'])
-            
-            # Return success response for AJAX call
-            return jsonify({'success': True, 'message': 'Job saved successfully'})
+            return {
+                'results': formatted_jobs,
+                'count': data.get('count', 0),
+                'page': page,
+                'total_pages': (data.get('count', 0) + 19) // 20
+            }
             
         except Exception as e:
-            # Log error for debugging and monitoring
-            app.logger.error(f"Failed to save job: {str(e)}")
-            # Rollback transaction to maintain database consistency
-            db.session.rollback()
-            # Return error response to client
-            return jsonify({'success': False, 'message': 'Failed to save job'})
+            return {'error': f'Failed to fetch jobs: {str(e)}', 'results': [], 'count': 0}
 
-    @app.route('/unsave_job', methods=['POST'])
-    @login_required  # Decorator ensures only authenticated users can access this route
-    def unsave_job():
-        """
-        AJAX endpoint for removing jobs from user's saved jobs list.
-        Accepts JSON data with job_id and removes corresponding SavedJob record.
-        """
+class AIService:
+    def __init__(self):
+        self.endpoint = os.environ.get('AZURE_AI_ENDPOINT')
+        self.api_key = os.environ.get('AZURE_AI_KEY')
+
+    def generate_summary(self, job_title, location, job_results):
+        if not all([self.endpoint, self.api_key]):
+            return {'summary': 'AI service not configured', 'error': True}
+
         try:
-            # Extract JSON data from POST request body
-            job_data = request.get_json()
+            # Prepare job data for AI
+            companies = list(set([job.get('company', '') for job in job_results[:10] if job.get('company')]))
+            salary_data = [job for job in job_results if job.get('salary_min') or job.get('salary_max')]
             
-            # Find the saved job record for this user and job ID
-            saved_job = SavedJob.query.filter_by(
-                user_id=current_user.id,
-                job_id=job_data['job_id']
-            ).first()
-            
-            # If job exists in saved jobs, delete it
-            if saved_job:
-                # Remove record from database session
-                db.session.delete(saved_job)
-                # Commit transaction to persist the deletion
-                db.session.commit()
-                # Return success response
-                return jsonify({'success': True, 'message': 'Job removed from saved jobs'})
+            if salary_data:
+                avg_min = sum(job.get('salary_min', 0) for job in salary_data) / len(salary_data)
+                avg_max = sum(job.get('salary_max', 0) for job in salary_data) / len(salary_data)
+                salary_info = f"Average salary range: £{avg_min:,.0f} - £{avg_max:,.0f}"
             else:
-                # Return error if job not found in saved jobs
-                return jsonify({'success': False, 'message': 'Job not found in saved jobs'})
-                
-        except Exception as e:
-            # Log error for debugging and monitoring
-            app.logger.error(f"Failed to unsave job: {str(e)}")
-            # Rollback transaction to maintain database consistency
-            db.session.rollback()
-            # Return error response to client
-            return jsonify({'success': False, 'message': 'Failed to remove job'})
+                salary_info = "Salary information not available"
 
-    @app.route('/saved_jobs')
-    @login_required  # Decorator ensures only authenticated users can access this route
-    def saved_jobs():
-        """
-        Display user's saved jobs with pagination.
-        Queries SavedJob records for current user and implements pagination
-        for better performance with large datasets.
-        """
-        # Get page number from URL query string, default to page 1
+            prompt = f"""
+            Analyze the job market for "{job_title}" positions in "{location}":
+            
+            Total jobs found: {len(job_results)}
+            Top companies: {', '.join(companies[:5]) if companies else 'Various companies'}
+            {salary_info}
+            
+            Provide a concise market summary covering:
+            1. Market demand and competition level
+            2. Salary expectations
+            3. Key insights for recruiters
+            
+            Keep response under 300 words.
+            """
+
+            payload = {
+                "messages": [
+                    {"role": "system", "content": "You are a recruitment analyst providing market insights."},
+                    {"role": "user", "content": prompt}
+                ],
+                "max_tokens": 400,
+                "temperature": 0.7
+            }
+
+            headers = {
+                "Content-Type": "application/json",
+                "api-key": self.api_key
+            }
+
+            response = requests.post(self.endpoint, headers=headers, json=payload, timeout=30)
+            response.raise_for_status()
+            result = response.json()
+            
+            summary = result['choices'][0]['message']['content'].strip()
+            return {'summary': summary, 'error': False}
+            
+        except Exception as e:
+            return {'summary': 'Unable to generate summary at this time.', 'error': True}
+
+# Routes
+@app.route('/health')
+def health_check():
+    """Health check endpoint for monitoring."""
+    try:
+        # Test database connection
+        db.session.execute('SELECT 1')
+        db_status = 'connected'
+    except Exception as e:
+        db_status = f'error: {str(e)}'
+    
+    return jsonify({
+        'status': 'healthy', 
+        'message': 'Job Sight application is running',
+        'environment': os.environ.get('FLASK_ENV', 'unknown'),
+        'database': db_status,
+        'ip_restrictions': os.environ.get('ENABLE_IP_RESTRICTIONS', 'false')
+    })
+
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+@app.route('/search', methods=['GET', 'POST'])
+def search_jobs():
+    if request.method == 'POST':
+        job_title = request.form.get('job_title', '').strip()
+        location = request.form.get('location', '').strip()
         page = request.args.get('page', 1, type=int)
         
-        # Query saved jobs for current user with pagination
-        saved_jobs = SavedJob.query.filter_by(user_id=current_user.id)\
-                                  .order_by(SavedJob.saved_at.desc())\
-                                  .paginate(
-                                      page=page,  # Current page number
-                                      per_page=app.config['JOBS_PER_PAGE'],  # Items per page from config
-                                      error_out=False  # Don't raise 404 for invalid page numbers
-                                  )
+        if not job_title or not location:
+            flash('Please enter both job title and location', 'error')
+            return render_template('index.html')
         
-        # Render saved jobs template with paginated results
-        return render_template('saved_jobs.html', saved_jobs=saved_jobs)
-
-    @app.route('/register', methods=['GET', 'POST'])
-    @limiter.limit("3 per minute")
-    def register():
-        """
-        User registration route handler.
-        Displays registration form and processes new user creation
-        with password hashing and database persistence.
-        """
-        # Redirect authenticated users away from registration page
-        if current_user.is_authenticated:
-            return redirect(url_for('index'))
+        # Search for jobs
+        job_api = JobAPI()
+        search_results = job_api.search_jobs(job_title, location, page)
         
-        # Create registration form instance
-        form = RegistrationForm()
+        # Generate AI summary
+        ai_summary = None
+        if search_results.get('results') and not search_results.get('error'):
+            ai_service = AIService()
+            ai_summary = ai_service.generate_summary(job_title, location, search_results['results'])
         
-        # Process form submission if validation passes
-        if form.validate_on_submit():
-            try:
-                # Create new User instance with form data
-                user = User(
-                    username=form.username.data,
-                    email=form.email.data,
-                    first_name=form.first_name.data,
-                    last_name=form.last_name.data
-                )
-                # Hash and set password using Werkzeug security functions
-                user.set_password(form.password.data)
-                
-                # Add new user to database session
-                db.session.add(user)
-                # Commit transaction to persist the new user
-                db.session.commit()
-                
-                # Flash success message for user feedback
-                flash('Registration successful! You can now log in.', 'success')
-                # Redirect to login page after successful registration
-                return redirect(url_for('login'))
-                
-            except Exception as e:
-                # Log registration error for debugging
-                app.logger.error(f"Registration failed: {str(e)}")
-                # Rollback transaction to maintain database consistency
-                db.session.rollback()
-                # Flash error message to user
-                flash('Registration failed. Please try again.', 'error')
-        
-        # Render registration template with form (includes validation errors)
-        return render_template('auth/register.html', form=form)
-
-    @app.route('/login', methods=['GET', 'POST'])
-    @limiter.limit("5 per minute")
-    def login():
-        """
-        User login route handler.
-        Authenticates users, manages sessions, and handles secure redirects
-        to prevent open redirect vulnerabilities.
-        """
-        # Redirect authenticated users away from login page
-        if current_user.is_authenticated:
-            return redirect(url_for('index'))
-        
-        # Create login form instance
-        form = LoginForm()
-        
-        # Process form submission if validation passes
-        if form.validate_on_submit():
-            # Query database for user by username
-            user = User.query.filter_by(username=form.username.data).first()
-            
-            # Verify user exists and password is correct
-            if user and user.check_password(form.password.data):
-                # Log user in using Flask-Login (creates session)
-                login_user(user)
-                
-                # Handle secure redirect to prevent open redirect attacks
-                next_page = request.args.get('next')
-                # Validate redirect URL to prevent external redirects
-                if not next_page or urlsplit(next_page).netloc != '':
-                    next_page = url_for('index')
-                
-                # Flash welcome message with user's first name
-                flash(f'Welcome back, {user.first_name}!', 'success')
-                # Redirect to intended page or home
-                return redirect(next_page)
-            else:
-                # Flash error message for invalid credentials
-                flash('Invalid username or password', 'error')
-        
-        # Render login template with form (includes validation errors)
-        return render_template('auth/login.html', form=form)
-
-    @app.route('/logout')
-    @login_required  # Decorator ensures only authenticated users can logout
-    def logout():
-        """
-        User logout route handler.
-        Clears user session and redirects to home page.
-        """
-        # Clear user session using Flask-Login
-        logout_user()
-        # Flash logout confirmation message
-        flash('You have been logged out.', 'info')
-        # Redirect to home page
-        return redirect(url_for('index'))
-
-    @app.route('/profile')
-    @login_required  # Decorator ensures only authenticated users can access profile
-    def profile():
-        """
-        User profile page route handler.
-        Displays user information, recent search history, and saved jobs statistics.
-        """
-        # Query user's recent search history with limit for performance
-        recent_searches = SearchHistory.query.filter_by(user_id=current_user.id)\
-                                            .order_by(SearchHistory.search_date.desc())\
-                                            .limit(10).all()
-        
-        # Count total saved jobs for user statistics
-        saved_jobs_count = SavedJob.query.filter_by(user_id=current_user.id).count()
-        
-        # Render profile template with user data
-        return render_template('profile.html',
-                             recent_searches=recent_searches,
-                             saved_jobs_count=saved_jobs_count)
+        return render_template('results.html',
+                             search_results=search_results,
+                             ai_summary=ai_summary,
+                             job_title=job_title,
+                             location=location,
+                             page=page)
     
-    # Return configured Flask application instance
-    return app
+    # Handle GET requests (for popular search links)
+    job_title = request.args.get('job_title', '').strip()
+    location = request.args.get('location', '').strip()
+    page = request.args.get('page', 1, type=int)
+    
+    if job_title and location:
+        # Search for jobs
+        job_api = JobAPI()
+        search_results = job_api.search_jobs(job_title, location, page)
+        
+        # Generate AI summary
+        ai_summary = None
+        if search_results.get('results') and not search_results.get('error'):
+            ai_service = AIService()
+            ai_summary = ai_service.generate_summary(job_title, location, search_results['results'])
+        
+        return render_template('results.html',
+                             search_results=search_results,
+                             ai_summary=ai_summary,
+                             job_title=job_title,
+                             location=location,
+                             page=page)
+    
+    return render_template('index.html')
 
-# Create application instance using factory pattern
-# This allows for easy testing and configuration management
-app = create_app()
+@app.route('/save_job', methods=['POST'])
+@login_required
+def save_job():
+    try:
+        job_data = request.get_json()
+        
+        # Check if job already saved
+        existing_job = SavedJob.query.filter_by(
+            user_id=current_user.id,
+            job_id=job_data['job_id']
+        ).first()
+        
+        if existing_job:
+            return jsonify({'success': False, 'message': 'Job already saved'})
+        
+        # Save new job
+        saved_job = SavedJob(
+            user_id=current_user.id,
+            job_id=job_data['job_id'],
+            job_title=job_data['job_title'],
+            company=job_data['company'],
+            location=job_data['location'],
+            salary_min=job_data.get('salary_min'),
+            salary_max=job_data.get('salary_max'),
+            job_url=job_data['job_url'],
+            description=job_data.get('description', '')
+        )
+        
+        db.session.add(saved_job)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': 'Job saved successfully'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': 'Failed to save job'})
 
-# Application entry point for direct execution
+@app.route('/unsave_job', methods=['POST'])
+@login_required
+def unsave_job():
+    try:
+        job_data = request.get_json()
+        saved_job = SavedJob.query.filter_by(
+            user_id=current_user.id,
+            job_id=job_data['job_id']
+        ).first()
+        
+        if saved_job:
+            db.session.delete(saved_job)
+            db.session.commit()
+            return jsonify({'success': True, 'message': 'Job removed from saved jobs'})
+        else:
+            return jsonify({'success': False, 'message': 'Job not found in saved jobs'})
+            
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': 'Failed to remove job'})
+
+@app.route('/saved_jobs')
+@login_required
+def saved_jobs():
+    page = request.args.get('page', 1, type=int)
+    saved_jobs = SavedJob.query.filter_by(user_id=current_user.id)\
+                              .order_by(SavedJob.saved_at.desc())\
+                              .paginate(page=page, per_page=20, error_out=False)
+    return render_template('saved_jobs.html', saved_jobs=saved_jobs)
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+    
+    if request.method == 'POST':
+        username = request.form.get('username')
+        email = request.form.get('email')
+        first_name = request.form.get('first_name')
+        last_name = request.form.get('last_name')
+        password = request.form.get('password')
+        password2 = request.form.get('password2')
+        
+        # Basic validation
+        if not all([username, email, first_name, last_name, password, password2]):
+            flash('All fields are required', 'error')
+            return render_template('auth/register.html')
+        
+        if password != password2:
+            flash('Passwords do not match', 'error')
+            return render_template('auth/register.html')
+        
+        if len(password) < 8:
+            flash('Password must be at least 8 characters', 'error')
+            return render_template('auth/register.html')
+        
+        # Check if user exists
+        if User.query.filter_by(username=username).first():
+            flash('Username already exists', 'error')
+            return render_template('auth/register.html')
+        
+        if User.query.filter_by(email=email).first():
+            flash('Email already registered', 'error')
+            return render_template('auth/register.html')
+        
+        try:
+            user = User(
+                username=username,
+                email=email,
+                first_name=first_name,
+                last_name=last_name
+            )
+            user.set_password(password)
+            db.session.add(user)
+            db.session.commit()
+            flash('Registration successful! You can now log in.', 'success')
+            return redirect(url_for('login'))
+        except Exception as e:
+            db.session.rollback()
+            flash('Registration failed. Please try again.', 'error')
+    
+    return render_template('auth/register.html')
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+    
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        
+        if not username or not password:
+            flash('Please enter both username and password', 'error')
+            return render_template('auth/login.html')
+        
+        user = User.query.filter_by(username=username).first()
+        if user and user.check_password(password):
+            login_user(user)
+            next_page = request.args.get('next')
+            if not next_page or next_page.startswith('/'):
+                next_page = url_for('index')
+            flash(f'Welcome back, {user.first_name}!', 'success')
+            return redirect(next_page)
+        else:
+            flash('Invalid username or password', 'error')
+    
+    return render_template('auth/login.html')
+
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    flash('You have been logged out.', 'info')
+    return redirect(url_for('index'))
+
+@app.route('/profile')
+@login_required
+def profile():
+    saved_jobs_count = SavedJob.query.filter_by(user_id=current_user.id).count()
+    return render_template('profile.html', saved_jobs_count=saved_jobs_count)
+
+# Error handlers
+@app.errorhandler(404)
+def not_found_error(error):
+    return render_template('404.html'), 404
+
+@app.errorhandler(500)
+def internal_error(error):
+    db.session.rollback()
+    return render_template('500.html'), 500
+
 if __name__ == '__main__':
-    # Create application context for database operations
     with app.app_context():
-        # Create all database tables if they don't exist
-        db.create_all()
-    # Run Flask development server on port 5000
-    # Debug disabled for production-like behavior
+        try:
+            db.create_all()
+            print("Database tables created successfully")
+        except Exception as e:
+            print(f"Warning: Could not create database tables: {e}")
+            print("Continuing without database initialization...")
     app.run(debug=False, port=5000)

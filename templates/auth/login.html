@@ -3,65 +3,30 @@
 {% block title %}Login - Job Sight{% endblock %}
 
 {% block content %}
-<div class="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-    <div class="max-w-md w-full space-y-8">
-        <div>
-            <div class="mx-auto h-12 w-12 flex items-center justify-center rounded-full bg-purple-100">
-                <svg class="h-8 w-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-                </svg>
-            </div>
-            <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">
-                Sign in to your account
-            </h2>
-            <p class="mt-2 text-center text-sm text-gray-600">
-                Or
-                <a href="{{ url_for('register') }}" class="font-medium text-purple-600 hover:text-purple-500">
-                    create a new account
-                </a>
-            </p>
+<div class="form-container" style="max-width: 500px; margin: 2rem auto;">
+    <div class="text-center mb-4">
+        <h2>Sign in to your account</h2>
+        <p>Or <a href="{{ url_for('register') }}">create a new account</a></p>
+    </div>
+    
+    <form method="POST">
+        <div class="form-group">
+            <label for="username" class="form-label">Username</label>
+            <input type="text" id="username" name="username" class="form-input" required>
         </div>
         
-        <form class="mt-8 space-y-6" method="POST">
-            {{ form.hidden_tag() }}
-            <div class="rounded-md shadow-sm -space-y-px">
-                <div>
-                    <label for="{{ form.username.id }}" class="sr-only">Username</label>
-                    {{ form.username(class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-purple-500 focus:border-purple-500 focus:z-10 sm:text-sm", placeholder="Username") }}
-                    {% if form.username.errors %}
-                        <div class="mt-1 text-sm text-red-600">
-                            {% for error in form.username.errors %}
-                                <p>{{ error }}</p>
-                            {% endfor %}
-                        </div>
-                    {% endif %}
-                </div>
-                <div>
-                    <label for="{{ form.password.id }}" class="sr-only">Password</label>
-                    {{ form.password(class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-purple-500 focus:border-purple-500 focus:z-10 sm:text-sm", placeholder="Password") }}
-                    {% if form.password.errors %}
-                        <div class="mt-1 text-sm text-red-600">
-                            {% for error in form.password.errors %}
-                                <p>{{ error }}</p>
-                            {% endfor %}
-                        </div>
-                    {% endif %}
-                </div>
-            </div>
+        <div class="form-group">
+            <label for="password" class="form-label">Password</label>
+            <input type="password" id="password" name="password" class="form-input" required>
+        </div>
 
-            <div>
-                {{ form.submit(class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500") }}
-            </div>
-        </form>
-        
-        <div class="text-center">
-            <p class="text-sm text-gray-600">
-                Don't have an account?
-                <a href="{{ url_for('register') }}" class="font-medium text-purple-600 hover:text-purple-500">
-                    Sign up here
-                </a>
-            </p>
+        <div class="form-group">
+            <button type="submit" class="form-button" style="width: 100%;">Sign In</button>
         </div>
+    </form>
+    
+    <div class="text-center">
+        <p>Don't have an account? <a href="{{ url_for('register') }}">Sign up here</a></p>
     </div>
 </div>
 {% endblock %}

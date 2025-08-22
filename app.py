@@ -13,6 +13,11 @@ load_dotenv()
 # Create Flask app
 app = Flask(__name__)
 
+# Add startup logging
+print("Starting Job Sight application...")
+print(f"Environment: {os.environ.get('FLASK_ENV', 'unknown')}")
+print(f"Database URL: {os.environ.get('DATABASE_URL', 'not set')[:20]}...")
+
 # IP Restriction functionality
 def check_ip_restriction():
     """Check if IP restrictions are enabled and if current IP is allowed"""
@@ -43,6 +48,10 @@ def check_ip_restriction():
 @app.before_request
 def before_request():
     """Check IP restrictions before processing any request"""
+    # Skip IP restriction check for health endpoint
+    if request.endpoint == 'health_check':
+        return
+    
     if not check_ip_restriction():
         return jsonify({'error': 'Access denied. Your IP is not authorized to access this environment.'}), 403
 
@@ -220,7 +229,20 @@ class AIService:
 @app.route('/health')
 def health_check():
     """Health check endpoint for monitoring."""
-    return jsonify({'status': 'healthy', 'message': 'Job Sight application is running'})
+    try:
+        # Test database connection
+        db.session.execute('SELECT 1')
+        db_status = 'connected'
+    except Exception as e:
+        db_status = f'error: {str(e)}'
+    
+    return jsonify({
+        'status': 'healthy', 
+        'message': 'Job Sight application is running',
+        'environment': os.environ.get('FLASK_ENV', 'unknown'),
+        'database': db_status,
+        'ip_restrictions': os.environ.get('ENABLE_IP_RESTRICTIONS', 'false')
+    })
 
 @app.route('/')
 def index():
@@ -450,5 +472,10 @@ def internal_error(error):
 
 if __name__ == '__main__':
     with app.app_context():
-        db.create_all()
+        try:
+            db.create_all()
+            print("Database tables created successfully")
+        except Exception as e:
+            print(f"Warning: Could not create database tables: {e}")
+            print("Continuing without database initialization...")
     app.run(debug=False, port=5000)

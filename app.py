@@ -217,6 +217,11 @@ class AIService:
             return {'summary': 'Unable to generate summary at this time.', 'error': True}
 
 # Routes
+@app.route('/health')
+def health_check():
+    """Health check endpoint for monitoring."""
+    return jsonify({'status': 'healthy', 'message': 'Job Sight application is running'})
+
 @app.route('/')
 def index():
     return render_template('index.html')

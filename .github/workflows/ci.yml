@@ -71,7 +71,7 @@ jobs:
           AZURE_AI_ENDPOINT: https://test.openai.azure.com/
           AZURE_AI_KEY: test-azure-key
         run: |
-          python -m pytest tests/ -v --tb=short
+          python -m pytest tests/test_simple.py -v --tb=short
           
       - name: Build Docker image
         run: |

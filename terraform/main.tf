@@ -278,10 +278,7 @@ resource "digitalocean_app" "app" {
 # Add project resources after app creation to avoid dependency issues
 resource "digitalocean_project_resources" "project_resources" {
   project = digitalocean_project.project.id
-  resources = concat(
-    digitalocean_app.app[*].urn,
-    digitalocean_app.testing_app[*].urn
-  )
+  resources = var.flask_env == "production" ? digitalocean_app.app[*].urn : digitalocean_app.testing_app[*].urn
   
   depends_on = [
     digitalocean_app.app,

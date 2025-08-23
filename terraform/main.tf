@@ -281,3 +281,8 @@ resource "digitalocean_app" "app" {
 # Note: DigitalOcean App Platform has built-in monitoring and alerting
 # The monitoring configuration is handled through the app spec alerts
 # Custom monitoring alerts can be configured through the DigitalOcean dashboard
+
+# Additional monitoring configuration
+# The monitoring system is now available in the monitoring/ directory
+# It provides custom visualizations and enhanced monitoring capabilities
+# using DigitalOcean's API to create custom dashboards and reports

@@ -230,8 +230,9 @@ class AIService:
 def health_check():
     """Health check endpoint for monitoring."""
     try:
-        # Test database connection
-        db.session.execute('SELECT 1')
+        # Test database connection using proper SQLAlchemy syntax
+        from sqlalchemy import text
+        db.session.execute(text('SELECT 1'))
         db_status = 'connected'
     except Exception as e:
         db_status = f'error: {str(e)}'

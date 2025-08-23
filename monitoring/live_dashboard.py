@@ -242,7 +242,7 @@ class JobSightMonitor:
                 return None
                 
             url = f"https://api.digitalocean.com/v2/apps/{self.app_id}/metrics"
-            response = requests.get(url, headers=self.headers)
+            response = requests.get(url, headers=self.headers, timeout=30)
             response.raise_for_status()
             
             return response.json()
@@ -300,4 +300,4 @@ if __name__ == '__main__':
     print("🔄 Data refreshes automatically every 30 seconds")
     print("=" * 50)
     
-    app.run(debug=False, host='0.0.0.0', port=5001)
+    app.run(debug=False, host='127.0.0.1', port=5001)

@@ -148,7 +148,7 @@ resource "digitalocean_project" "project" {
 
 resource "digitalocean_app" "app" {
   # Ensure registry is created first (only in production)
-  depends_on = var.flask_env == "production" ? [digitalocean_container_registry.app_registry] : []
+  depends_on = [digitalocean_container_registry.app_registry]
   
   # Only create this resource if it's not a testing environment
   count = var.flask_env == "production" ? 1 : 0

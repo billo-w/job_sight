@@ -9,9 +9,6 @@ terraform {
 
 # Separate app for testing environments
 resource "digitalocean_app" "testing_app" {
-  # Ensure registry is created first
-  depends_on = [digitalocean_container_registry.app_registry]
-  
   # Only create this resource if it's a testing environment
   count = var.flask_env == "testing" ? 1 : 0
 
@@ -132,23 +129,25 @@ provider "digitalocean" {
   token = var.do_token
 }
 
+# Only create registry and project in production environment
+# Testing environments will use the existing ones
 resource "digitalocean_container_registry" "app_registry" {
+  count                  = var.flask_env == "production" ? 1 : 0
   name                   = "job-sight-app"
   subscription_tier_slug = "basic"
 }
 
 resource "digitalocean_project" "project" {
+  count       = var.flask_env == "production" ? 1 : 0
   name        = "Job-Sight-Project"
   description = "Job Sight Application Project"
   purpose     = "Web Application"
   environment = "Production"
   is_default  = true
-  # Remove the direct dependency to avoid circular reference issues
-  # Resources can be added after app creation
 }
 
 resource "digitalocean_app" "app" {
-  # Ensure registry is created first
+  # Ensure registry is created first (only in production)
   depends_on = [digitalocean_container_registry.app_registry]
   
   # Only create this resource if it's not a testing environment

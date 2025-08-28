@@ -156,10 +156,10 @@ jobs:
         with:
           terraform_version: '1.12.0'
 
-      - name: Terraform Init
+      - name: Terraform Init (Production)
         working-directory: terraform
         run: |
-          terraform init -reconfigure -upgrade
+          terraform init -reconfigure -upgrade -backend-config="key=terraform.tfstate"
           
       - name: Terraform Validate
         working-directory: terraform
@@ -267,10 +267,12 @@ jobs:
         with:
           terraform_version: '1.12.0'
 
-      - name: Terraform Init
+      - name: Terraform Init (Testing)
         working-directory: terraform
         run: |
-          terraform init -reconfigure -upgrade
+          # Use branch name for testing state file
+          BRANCH_NAME=$(echo "${{ github.ref_name }}" | sed 's/[^a-zA-Z0-9-]/-/g')
+          terraform init -reconfigure -upgrade -backend-config="key=testing-${BRANCH_NAME}.tfstate"
           
       - name: Terraform Validate
         working-directory: terraform
@@ -279,21 +281,21 @@ jobs:
       - name: Terraform Plan
         working-directory: terraform
         run: |
-          export TF_VAR_app_name=${{ env.TF_VAR_app_name }}
           terraform plan -out=tfplan -detailed-exitcode
         continue-on-error: false
 
       - name: Terraform Apply Testing Environment
         working-directory: terraform
         run: |
-          export TF_VAR_app_name=${{ env.TF_VAR_app_name }}
           terraform apply -auto-approve tfplan
 
   cleanup-testing:
     runs-on: ubuntu-latest
-    if: github.event_name == 'delete' || (github.ref == 'refs/heads/main' && github.event_name == 'push')
+    if: github.event_name == 'delete'
     env:
       TF_VAR_do_token: ${{ secrets.DO_TOKEN }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.SPACES_ACCESS_KEY }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.SPACES_SECRET_KEY }}
     steps:
       - uses: actions/checkout@v4
       
@@ -302,10 +304,15 @@ jobs:
         with:
           terraform_version: '1.12.0'
 
-      - name: Cleanup Testing Environments
+      - name: Cleanup Testing Environment
+        working-directory: terraform
         run: |
-          # This would need to be implemented based on your specific needs
-          # For now, we'll just log that cleanup is needed
-          echo "Testing environment cleanup would happen here"
-          echo "For feature branches, you might want to destroy the testing environment"
-          echo "This could be done by maintaining a list of testing environments and destroying them"
+          # Get the branch name from the deleted ref
+          BRANCH_NAME=$(echo "${{ github.event.ref }}" | sed 's/refs\/heads\///' | sed 's/[^a-zA-Z0-9-]/-/g')
+          echo "Cleaning up testing environment for branch: $BRANCH_NAME"
+          
+          # Initialize with the testing state file
+          terraform init -reconfigure -upgrade -backend-config="key=testing-${BRANCH_NAME}.tfstate"
+          
+          # Destroy the testing environment
+          terraform destroy -auto-approve

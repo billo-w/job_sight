@@ -5,7 +5,9 @@ terraform {
       s3 = "https://lon1.digitaloceanspaces.com"
     }
     bucket                      = "job-sight-terraform"
-    key                         = "terraform.tfstate"
+    # Dynamic key will be set via terraform init -backend-config
+    # Production: terraform.tfstate
+    # Testing: testing-{branch-name}.tfstate
     skip_credentials_validation = true
     skip_metadata_api_check     = true
     skip_region_validation      = true

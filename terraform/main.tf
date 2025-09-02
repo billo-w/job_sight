@@ -227,57 +227,70 @@ resource "digitalocean_app" "app" {
       env {
         key   = "SECRET_KEY"
         value = var.secret_key
+        type = "SECRET"
       }
       env {
         key   = "FLASK_ENV"
         value = var.flask_env
+        type = "SECRET"
       }
       env {
         key   = "DATABASE_URL"
         value = var.database_url
+        type = "SECRET"
       }
       env {
         key   = "ADZUNA_APP_ID"
         value = var.adzuna_app_id
+        type = "SECRET"
       }
       env {
         key   = "ADZUNA_APP_KEY"
         value = var.adzuna_app_key
+        type = "SECRET"
       }
       env {
         key   = "AZURE_AI_ENDPOINT"
         value = var.azure_ai_endpoint
+        type = "SECRET"
       }
       env {
         key   = "AZURE_AI_KEY"
         value = var.azure_ai_key
+        type = "SECRET"
       }
       # Monitoring environment variables
       env {
         key   = "APP_VERSION"
         value = var.app_version
+        type = "SECRET"
       }
       env {
         key   = "ENABLE_METRICS"
         value = "true"
+        type = "SECRET"
       }
       env {
         key   = "LOG_LEVEL"
         value = "INFO"
+        type = "SECRET"
       }
       # IP restriction environment variables
       env {
         key   = "ENABLE_IP_RESTRICTIONS"
         value = var.enable_ip_restrictions ? "true" : "false"
+        type = "SECRET"
       }
       env {
         key   = "ALLOWED_IPS"
         value = join(",", var.allowed_ips)
+        type = "SECRET"
       }
     }
     env {
       key   = "ALLOWED_IPS"
       value = join(",", var.allowed_ips)
+      type = "SECRET"
     }
   }
 
@@ -285,15 +298,3 @@ resource "digitalocean_app" "app" {
     create = "20m"
   }
 }
-
-# Project resources assignment removed to avoid conflicts
-# Apps will be manually added to the project if needed
-
-# Note: DigitalOcean App Platform has built-in monitoring and alerting
-# The monitoring configuration is handled through the app spec alerts
-# Custom monitoring alerts can be configured through the DigitalOcean dashboard
-
-# Additional monitoring configuration
-# The monitoring system is now available in the monitoring/ directory
-# It provides custom visualizations and enhanced monitoring capabilities
-# using DigitalOcean's API to create custom dashboards and reports

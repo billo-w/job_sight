@@ -16,7 +16,10 @@ load_dotenv()
 def setup_logging():
     """Configure application logging with multiple levels"""
     log_level = os.environ.get('LOG_LEVEL', 'INFO').upper()
-    log_format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    
+    # Use a simpler format that works better with syslog/Better Stack
+    # The log level will be properly transmitted via syslog priority
+    log_format = '%(message)s'
     
     # Clear any existing handlers to avoid duplicates
     for handler in logging.root.handlers[:]:

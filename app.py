@@ -14,12 +14,11 @@ load_dotenv()
 
 # Configure logging
 def setup_logging():
-    """Configure application logging with multiple levels"""
+    """Configure application logging with proper levels and security"""
     log_level = os.environ.get('LOG_LEVEL', 'INFO').upper()
     
-    # Use a simpler format that works better with syslog/Better Stack
-    # The log level will be properly transmitted via syslog priority
-    log_format = '%(message)s'
+    # Use a format that includes log level and timestamp for Better Stack
+    log_format = '[%(levelname)s] %(asctime)s - %(name)s - %(message)s'
     
     # Clear any existing handlers to avoid duplicates
     for handler in logging.root.handlers[:]:
@@ -40,9 +39,13 @@ def setup_logging():
     logger = logging.getLogger('job_sight')
     logger.setLevel(getattr(logging, log_level, logging.INFO))
     
-    # Set specific log levels for different components
+    # Set specific log levels for different components to reduce noise
     logging.getLogger('werkzeug').setLevel(logging.WARNING)  # Reduce Flask request logs
     logging.getLogger('urllib3').setLevel(logging.WARNING)   # Reduce HTTP request logs
+    logging.getLogger('sqlalchemy.engine').setLevel(logging.WARNING)  # Hide SQL queries
+    logging.getLogger('sqlalchemy.dialects').setLevel(logging.WARNING)  # Hide SQL dialects
+    logging.getLogger('sqlalchemy.pool').setLevel(logging.WARNING)  # Hide connection pool
+    logging.getLogger('sqlalchemy.orm').setLevel(logging.WARNING)  # Hide ORM details
     
     return logger
 
@@ -220,8 +223,8 @@ class JobAPI:
             logger.error(f"HTTP error {e.response.status_code} when fetching jobs: {str(e)}")
             return {'error': f'API error: {e.response.status_code}', 'results': [], 'count': 0}
         except Exception as e:
-            logger.error(f"Unexpected error in job search: {str(e)}", exc_info=True)
-            return {'error': f'Failed to fetch jobs: {str(e)}', 'results': [], 'count': 0}
+            logger.error(f"Unexpected error in job search: {str(e)}")
+            return {'error': 'Failed to fetch jobs due to unexpected error', 'results': [], 'count': 0}
 
 class AIService:
     def __init__(self):
@@ -291,7 +294,7 @@ class AIService:
             logger.error(f"HTTP error {e.response.status_code} when calling Azure AI: {str(e)}")
             return {'summary': 'AI service temporarily unavailable', 'error': True}
         except Exception as e:
-            logger.error(f"Unexpected error in AI summary generation: {str(e)}", exc_info=True)
+            logger.error(f"Unexpected error in AI summary generation: {str(e)}")
             return {'summary': 'Unable to generate summary at this time.', 'error': True}
 
 # Routes
@@ -408,7 +411,7 @@ def save_job():
         
     except Exception as e:
         db.session.rollback()
-        logger.error(f"Failed to save job for user {current_user.username}: {str(e)}", exc_info=True)
+        logger.error(f"Failed to save job for user {current_user.username}: {str(e)}")
         return jsonify({'success': False, 'message': 'Failed to save job'})
 
 @app.route('/unsave_job', methods=['POST'])
@@ -434,7 +437,7 @@ def unsave_job():
             
     except Exception as e:
         db.session.rollback()
-        logger.error(f"Failed to remove saved job for user {current_user.username}: {str(e)}", exc_info=True)
+        logger.error(f"Failed to remove saved job for user {current_user.username}: {str(e)}")
         return jsonify({'success': False, 'message': 'Failed to remove job'})
 
 @app.route('/saved_jobs')
@@ -496,7 +499,7 @@ def register():
             return redirect(url_for('login'))
         except Exception as e:
             db.session.rollback()
-            logger.error(f"Registration failed for user {username}: {str(e)}", exc_info=True)
+            logger.error(f"Registration failed for user {username}: {str(e)}")
             flash('Registration failed. Please try again.', 'error')
     
     return render_template('auth/register.html')
@@ -553,7 +556,7 @@ def not_found_error(error):
 @app.errorhandler(500)
 def internal_error(error):
     db.session.rollback()
-    logger.error(f"500 error: {str(error)}", exc_info=True)
+    logger.error(f"500 error: {str(error)}")
     return render_template('500.html'), 500
 
 if __name__ == '__main__':
@@ -562,7 +565,7 @@ if __name__ == '__main__':
             db.create_all()
             logger.info("Database tables created successfully")
         except Exception as e:
-            logger.error(f"Could not create database tables: {e}", exc_info=True)
+            logger.error(f"Could not create database tables: {e}")
             logger.warning("Continuing without database initialization...")
     
     logger.info("Job Sight application startup complete")

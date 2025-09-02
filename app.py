@@ -18,6 +18,10 @@ def setup_logging():
     log_level = os.environ.get('LOG_LEVEL', 'INFO').upper()
     log_format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     
+    # Clear any existing handlers to avoid duplicates
+    for handler in logging.root.handlers[:]:
+        logging.root.removeHandler(handler)
+    
     # Configure root logger
     logging.basicConfig(
         level=getattr(logging, log_level, logging.INFO),
@@ -25,11 +29,13 @@ def setup_logging():
         handlers=[
             logging.StreamHandler(sys.stdout),
             logging.FileHandler('job_sight.log', mode='a')
-        ]
+        ],
+        force=True  # Force reconfiguration
     )
     
     # Create application logger
     logger = logging.getLogger('job_sight')
+    logger.setLevel(getattr(logging, log_level, logging.INFO))
     
     # Set specific log levels for different components
     logging.getLogger('werkzeug').setLevel(logging.WARNING)  # Reduce Flask request logs

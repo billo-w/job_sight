@@ -5,18 +5,52 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
 import requests
 import os
+import logging
+import sys
 from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
 
+# Configure logging
+def setup_logging():
+    """Configure application logging with multiple levels"""
+    log_level = os.environ.get('LOG_LEVEL', 'INFO').upper()
+    log_format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    
+    # Configure root logger
+    logging.basicConfig(
+        level=getattr(logging, log_level, logging.INFO),
+        format=log_format,
+        handlers=[
+            logging.StreamHandler(sys.stdout),
+            logging.FileHandler('job_sight.log', mode='a')
+        ]
+    )
+    
+    # Create application logger
+    logger = logging.getLogger('job_sight')
+    
+    # Set specific log levels for different components
+    logging.getLogger('werkzeug').setLevel(logging.WARNING)  # Reduce Flask request logs
+    logging.getLogger('urllib3').setLevel(logging.WARNING)   # Reduce HTTP request logs
+    
+    return logger
+
+# Setup logging
+logger = setup_logging()
+
 # Create Flask app
 app = Flask(__name__)
 
-# Add startup logging
-print("Starting Job Sight application...")
-print(f"Environment: {os.environ.get('FLASK_ENV', 'unknown')}")
-print(f"Database URL: {os.environ.get('DATABASE_URL', 'not set')[:20]}...")
+# Add startup logging with proper levels
+logger.info("Starting Job Sight application...")
+logger.info(f"Environment: {os.environ.get('FLASK_ENV', 'unknown')}")
+logger.info(f"Log level set to: {os.environ.get('LOG_LEVEL', 'INFO')}")
+if os.environ.get('DATABASE_URL'):
+    logger.info(f"Database URL configured: {os.environ.get('DATABASE_URL', 'not set')[:20]}...")
+else:
+    logger.warning("DATABASE_URL not configured, using default SQLite")
 
 # IP Restriction functionality
 def check_ip_restriction():
@@ -53,6 +87,8 @@ def before_request():
         return
     
     if not check_ip_restriction():
+        client_ip = request.remote_addr
+        logger.warning(f"Access denied for IP {client_ip} - not in allowed list")
         return jsonify({'error': 'Access denied. Your IP is not authorized to access this environment.'}), 403
 
 # Basic configuration
@@ -123,8 +159,11 @@ class JobAPI:
 
     def search_jobs(self, job_title, location, page=1):
         if not all([self.app_id, self.app_key]):
+            logger.error("Adzuna API credentials not configured - missing app_id or app_key")
             return {'error': 'API credentials not configured', 'results': [], 'count': 0}
 
+        logger.info(f"Searching jobs: '{job_title}' in '{location}' (page {page})")
+        
         try:
             url = f"{self.base_url}/gb/search/{page}"
             params = {
@@ -139,6 +178,9 @@ class JobAPI:
             response = requests.get(url, params=params, timeout=10)
             response.raise_for_status()
             data = response.json()
+            
+            job_count = data.get('count', 0)
+            logger.info(f"Successfully fetched {job_count} jobs from Adzuna API")
             
             formatted_jobs = []
             for job in data.get('results', []):
@@ -157,12 +199,19 @@ class JobAPI:
             
             return {
                 'results': formatted_jobs,
-                'count': data.get('count', 0),
+                'count': job_count,
                 'page': page,
-                'total_pages': (data.get('count', 0) + 19) // 20
+                'total_pages': (job_count + 19) // 20
             }
             
+        except requests.exceptions.Timeout:
+            logger.error(f"Timeout error when fetching jobs for '{job_title}' in '{location}'")
+            return {'error': 'Request timeout - please try again', 'results': [], 'count': 0}
+        except requests.exceptions.HTTPError as e:
+            logger.error(f"HTTP error {e.response.status_code} when fetching jobs: {str(e)}")
+            return {'error': f'API error: {e.response.status_code}', 'results': [], 'count': 0}
         except Exception as e:
+            logger.error(f"Unexpected error in job search: {str(e)}", exc_info=True)
             return {'error': f'Failed to fetch jobs: {str(e)}', 'results': [], 'count': 0}
 
 class AIService:
@@ -172,8 +221,11 @@ class AIService:
 
     def generate_summary(self, job_title, location, job_results):
         if not all([self.endpoint, self.api_key]):
+            logger.warning("Azure AI service not configured - missing endpoint or API key")
             return {'summary': 'AI service not configured', 'error': True}
 
+        logger.info(f"Generating AI summary for '{job_title}' in '{location}' with {len(job_results)} jobs")
+        
         try:
             # Prepare job data for AI
             companies = list(set([job.get('company', '') for job in job_results[:10] if job.get('company')]))
@@ -220,9 +272,17 @@ class AIService:
             result = response.json()
             
             summary = result['choices'][0]['message']['content'].strip()
+            logger.info("Successfully generated AI summary")
             return {'summary': summary, 'error': False}
             
+        except requests.exceptions.Timeout:
+            logger.error(f"Timeout error when generating AI summary for '{job_title}' in '{location}'")
+            return {'summary': 'AI service timeout - please try again', 'error': True}
+        except requests.exceptions.HTTPError as e:
+            logger.error(f"HTTP error {e.response.status_code} when calling Azure AI: {str(e)}")
+            return {'summary': 'AI service temporarily unavailable', 'error': True}
         except Exception as e:
+            logger.error(f"Unexpected error in AI summary generation: {str(e)}", exc_info=True)
             return {'summary': 'Unable to generate summary at this time.', 'error': True}
 
 # Routes
@@ -315,6 +375,7 @@ def save_job():
         ).first()
         
         if existing_job:
+            logger.debug(f"User {current_user.username} attempted to save already saved job {job_data['job_id']}")
             return jsonify({'success': False, 'message': 'Job already saved'})
         
         # Save new job
@@ -333,10 +394,12 @@ def save_job():
         db.session.add(saved_job)
         db.session.commit()
         
+        logger.info(f"User {current_user.username} saved job: {job_data['job_title']} at {job_data['company']}")
         return jsonify({'success': True, 'message': 'Job saved successfully'})
         
     except Exception as e:
         db.session.rollback()
+        logger.error(f"Failed to save job for user {current_user.username}: {str(e)}", exc_info=True)
         return jsonify({'success': False, 'message': 'Failed to save job'})
 
 @app.route('/unsave_job', methods=['POST'])
@@ -350,14 +413,19 @@ def unsave_job():
         ).first()
         
         if saved_job:
+            job_title = saved_job.job_title
+            company = saved_job.company
             db.session.delete(saved_job)
             db.session.commit()
+            logger.info(f"User {current_user.username} removed saved job: {job_title} at {company}")
             return jsonify({'success': True, 'message': 'Job removed from saved jobs'})
         else:
+            logger.debug(f"User {current_user.username} attempted to remove non-existent saved job {job_data['job_id']}")
             return jsonify({'success': False, 'message': 'Job not found in saved jobs'})
             
     except Exception as e:
         db.session.rollback()
+        logger.error(f"Failed to remove saved job for user {current_user.username}: {str(e)}", exc_info=True)
         return jsonify({'success': False, 'message': 'Failed to remove job'})
 
 @app.route('/saved_jobs')
@@ -414,10 +482,12 @@ def register():
             user.set_password(password)
             db.session.add(user)
             db.session.commit()
+            logger.info(f"New user registered: {username} ({email})")
             flash('Registration successful! You can now log in.', 'success')
             return redirect(url_for('login'))
         except Exception as e:
             db.session.rollback()
+            logger.error(f"Registration failed for user {username}: {str(e)}", exc_info=True)
             flash('Registration failed. Please try again.', 'error')
     
     return render_template('auth/register.html')
@@ -441,9 +511,11 @@ def login():
             next_page = request.args.get('next')
             if not next_page or next_page.startswith('/'):
                 next_page = url_for('index')
+            logger.info(f"User {username} logged in successfully")
             flash(f'Welcome back, {user.first_name}!', 'success')
             return redirect(next_page)
         else:
+            logger.warning(f"Failed login attempt for username: {username}")
             flash('Invalid username or password', 'error')
     
     return render_template('auth/login.html')
@@ -451,7 +523,9 @@ def login():
 @app.route('/logout')
 @login_required
 def logout():
+    username = current_user.username
     logout_user()
+    logger.info(f"User {username} logged out")
     flash('You have been logged out.', 'info')
     return redirect(url_for('index'))
 
@@ -464,19 +538,23 @@ def profile():
 # Error handlers
 @app.errorhandler(404)
 def not_found_error(error):
+    logger.warning(f"404 error: {request.url} not found")
     return render_template('404.html'), 404
 
 @app.errorhandler(500)
 def internal_error(error):
     db.session.rollback()
+    logger.error(f"500 error: {str(error)}", exc_info=True)
     return render_template('500.html'), 500
 
 if __name__ == '__main__':
     with app.app_context():
         try:
             db.create_all()
-            print("Database tables created successfully")
+            logger.info("Database tables created successfully")
         except Exception as e:
-            print(f"Warning: Could not create database tables: {e}")
-            print("Continuing without database initialization...")
+            logger.error(f"Could not create database tables: {e}", exc_info=True)
+            logger.warning("Continuing without database initialization...")
+    
+    logger.info("Job Sight application startup complete")
     app.run(debug=False, port=5000)

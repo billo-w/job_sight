@@ -169,6 +169,11 @@ resource "digitalocean_app" "app" {
     name   = var.app_name
     region = "lon"
 
+    domain {
+      name = "job-sight.app"
+      type = "DEFAULT"
+    }
+
     alert {
       rule = "DEPLOYMENT_FAILED"
     }
@@ -292,9 +297,5 @@ resource "digitalocean_app" "app" {
       value = join(",", var.allowed_ips)
       type = "SECRET"
     }
-  }
-
-  timeouts {
-    create = "20m"
   }
 }

@@ -171,7 +171,7 @@ resource "digitalocean_app" "app" {
 
     domain {
       name = "job-sight.app"
-      type = "DEFAULT"
+      type = "PRIMARY"
     }
 
     alert {

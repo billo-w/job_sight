@@ -140,3 +140,5 @@ monitoring/local/
 monitoring/secrets/
 
 .cursor/
+CALUDE.md
+.claude

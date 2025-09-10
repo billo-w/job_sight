@@ -53,6 +53,6 @@ Visit `http://localhost:5000` to use the application.
 ## Technology Stack
 
 - **Backend**: Flask (Python web framework)
-- **Database**: SQLite (for user accounts and saved jobs)
+- **Database**: PostgreSQL (for user accounts and saved jobs)
 - **External APIs**: Adzuna Jobs API, Azure AI
 - **Frontend**: HTML/CSS with responsive design

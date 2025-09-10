@@ -6,7 +6,6 @@ from datetime import datetime
 import requests
 import os
 import logging
-import sys
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -29,7 +28,7 @@ def setup_logging():
         level=getattr(logging, log_level, logging.INFO),
         format=log_format,
         handlers=[
-            logging.StreamHandler(sys.stdout),
+            logging.StreamHandler(),
             logging.FileHandler('job_sight.log', mode='a')
         ],
         force=True  # Force reconfiguration

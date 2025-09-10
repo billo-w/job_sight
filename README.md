@@ -1,5 +1,7 @@
 # Job Sight
 
+job-sight.app
+
 A Flask web application that helps users search for jobs and get AI-powered insights about the job market.
 
 ## What This Application Does

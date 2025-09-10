@@ -292,10 +292,5 @@ resource "digitalocean_app" "app" {
         type = "SECRET"
       }
     }
-    env {
-      key   = "ALLOWED_IPS"
-      value = join(",", var.allowed_ips)
-      type = "SECRET"
-    }
   }
 }

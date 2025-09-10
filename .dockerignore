@@ -19,7 +19,6 @@ nosetests.xml
 coverage.xml
 *.cover
 *.log
-.git
 .mypy_cache
 .pytest_cache
 .hypothesis
@@ -51,8 +50,6 @@ htmlcov/
 
 # Documentation
 docs/
-*.md
-README.md
 
 # CI/CD
 .github/

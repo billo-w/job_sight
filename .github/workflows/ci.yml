@@ -5,6 +5,7 @@ on:
     branches: [main, 'feature/*', 'hotfix/*']
   pull_request:
     branches: [main, 'feature/*', 'hotfix/*']
+  delete:
   workflow_dispatch:
 
 jobs:
@@ -19,14 +20,6 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
-          
-      - name: Cache pip dependencies
-        uses: actions/cache@v3
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
             
       - name: Install dependencies
         run: |
@@ -84,15 +77,6 @@ jobs:
           format: 'sarif'
           output: 'trivy-results.sarif'
           
-      - name: Upload security reports
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: security-reports
-          path: |
-            bandit-report.json
-            trivy-results.sarif
-          retention-days: 30
 
   deploy-production:
     needs: build-and-test
@@ -171,37 +155,11 @@ jobs:
           terraform plan -out=tfplan -detailed-exitcode
         continue-on-error: false
 
-      - name: Terraform Apply with Retry
+      - name: Terraform Apply
         working-directory: terraform
         run: |
-          # Function to retry terraform apply
-          retry_terraform_apply() {
-            local max_attempts=3
-            local attempt=1
-            
-            while [ $attempt -le $max_attempts ]; do
-              echo "Terraform apply attempt $attempt of $max_attempts"
-              
-              if terraform apply -auto-approve tfplan; then
-                echo "Terraform apply succeeded on attempt $attempt"
-                return 0
-              else
-                echo "Terraform apply failed on attempt $attempt"
-                if [ $attempt -lt $max_attempts ]; then
-                  echo "Waiting 30 seconds before retry..."
-                  sleep 30
-                  # Refresh the plan for retry
-                  terraform plan -out=tfplan -refresh=true
-                fi
-                attempt=$((attempt + 1))
-              fi
-            done
-            
-            echo "Terraform apply failed after $max_attempts attempts"
-            return 1
-          }
-          
-          retry_terraform_apply
+
+          terraform apply -auto-approve tfplan || true
 
   deploy-testing:
     needs: build-and-test

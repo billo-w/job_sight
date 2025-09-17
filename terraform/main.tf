@@ -7,6 +7,17 @@ terraform {
   }
 }
 
+# DigitalOcean App Platform static ingress IP addresses
+# These are global, shared IPs that route traffic to your app
+locals {
+  app_platform_static_ips = {
+    ipv4 = [
+      "162.159.140.98",
+      "172.66.0.96"
+    ]
+  }
+}
+
 # Separate app for testing environments
 resource "digitalocean_app" "testing_app" {
   # Only create this resource if it's a testing environment
@@ -175,11 +186,6 @@ resource "digitalocean_app" "app" {
       name = "job-sight.app"
       type = "PRIMARY"
     }
-
-    domain {
-      name = "job-sight-sight-sight"
-      type = "DEFAULT"
-    } 
 
     alert {
       rule = "DEPLOYMENT_FAILED"

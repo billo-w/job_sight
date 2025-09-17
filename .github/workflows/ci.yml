@@ -158,8 +158,7 @@ jobs:
       - name: Terraform Apply
         working-directory: terraform
         run: |
-
-          terraform apply -auto-approve tfplan || true
+          terraform apply -auto-approve tfplan
 
   deploy-testing:
     needs: build-and-test
@@ -185,7 +184,7 @@ jobs:
       TF_VAR_image_tag:     "${{ github.sha }}"
       TF_VAR_app_version:   "${{ github.ref_name }}"
       TF_VAR_enable_ip_restrictions: "true"
-      TF_VAR_allowed_ips:   '["${{ secrets.TESTING_ALLOWED_IPS }}"]'
+      TF_VAR_allowed_ips:    ${{ secrets.TESTING_ALLOWED_IPS }}
       AWS_ACCESS_KEY_ID:     ${{ secrets.SPACES_ACCESS_KEY }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.SPACES_SECRET_KEY }}
     steps:
@@ -249,7 +248,7 @@ jobs:
 
   cleanup-testing:
     runs-on: ubuntu-latest
-    if: github.event_name == 'delete'
+    if: github.event_name == 'delete' && github.event.ref_type == 'branch' && (startsWith(github.event.ref, 'feature/') || startsWith(github.event.ref, 'hotfix/'))
     env:
       # Required Terraform variables for cleanup
       TF_VAR_do_token: ${{ secrets.DO_TOKEN }}
@@ -269,8 +268,6 @@ jobs:
       AWS_ACCESS_KEY_ID: ${{ secrets.SPACES_ACCESS_KEY }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.SPACES_SECRET_KEY }}
     steps:
-      - uses: actions/checkout@v4
-      
       - name: Install Terraform
         uses: hashicorp/setup-terraform@v3
         with:

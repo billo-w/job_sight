@@ -274,7 +274,6 @@ jobs:
           terraform_version: '1.12.0'
 
       - name: Cleanup Testing Environment
-        working-directory: terraform
         run: |
           # Get the branch name from the deleted ref
           BRANCH_NAME=$(echo "${{ github.event.ref }}" | sed 's/refs\/heads\///' | sed 's/[^a-zA-Z0-9-]/-/g')

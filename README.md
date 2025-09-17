@@ -4,7 +4,7 @@ Visit the site below:
 
 https://job-sight.app
 
-A Flask web application that helps users search for jobs and get AI-powered insights about the job market.
+A web application that helps users search for jobs and get AI-powered insights about the job market.
 
 ## What This Application Does
 

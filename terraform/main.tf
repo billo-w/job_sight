@@ -174,6 +174,11 @@ resource "digitalocean_app" "app" {
       type = "PRIMARY"
     }
 
+    domain {
+      name = "job-sight-app-a5lw4.ondigitalocean.app"
+      type = "DEFAULT"
+    }
+
     alert {
       rule = "DEPLOYMENT_FAILED"
     }

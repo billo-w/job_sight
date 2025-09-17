@@ -175,7 +175,7 @@ resource "digitalocean_app" "app" {
     }
 
     domain {
-      name = "job-sight-app-a5lw4.ondigitalocean.app"
+      name = "job-sight-app-a5lw4"
       type = "DEFAULT"
     }
 

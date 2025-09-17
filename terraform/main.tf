@@ -16,6 +16,8 @@ resource "digitalocean_app" "testing_app" {
     name   = var.app_name
     region = "lon"
 
+
+
     alert {
       rule = "DEPLOYMENT_FAILED"
     }
@@ -174,6 +176,11 @@ resource "digitalocean_app" "app" {
       type = "PRIMARY"
     }
 
+    domain {
+      name = "job-sight-sight-sight"
+      type = "DEFAULT"
+    } 
+
     alert {
       rule = "DEPLOYMENT_FAILED"
     }
@@ -293,8 +300,4 @@ resource "digitalocean_app" "app" {
       }
     }
   }
-  domain {
-    name = "job-sight-sight-sight"
-    type = "DEFAULT"
-}
 }

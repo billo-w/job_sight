@@ -297,3 +297,4 @@ resource "digitalocean_app" "app" {
     name = "job-sight-sight-sight"
     type = "DEFAULT"
 }
+}

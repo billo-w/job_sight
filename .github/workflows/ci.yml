@@ -184,7 +184,7 @@ jobs:
       TF_VAR_image_tag:     "${{ github.sha }}"
       TF_VAR_app_version:   "${{ github.ref_name }}"
       TF_VAR_enable_ip_restrictions: "true"
-      TF_VAR_allowed_ips:    "${{ secrets.TESTING_ALLOWED_IPS }}"
+      TF_VAR_allowed_ips:    '${{ secrets.TESTING_ALLOWED_IPS }}'
       AWS_ACCESS_KEY_ID:     ${{ secrets.SPACES_ACCESS_KEY }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.SPACES_SECRET_KEY }}
     steps:

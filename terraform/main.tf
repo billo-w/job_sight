@@ -174,11 +174,6 @@ resource "digitalocean_app" "app" {
       type = "PRIMARY"
     }
 
-    domain {
-      name = "job-sight-app-a5lw4"
-      type = "DEFAULT"
-    }
-
     alert {
       rule = "DEPLOYMENT_FAILED"
     }
@@ -298,4 +293,7 @@ resource "digitalocean_app" "app" {
       }
     }
   }
+  domain {
+    name = "job-sight-sight-sight"
+    type = "DEFAULT"
 }

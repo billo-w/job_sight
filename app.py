@@ -9,6 +9,7 @@ import logging
 import sys
 import json
 from dotenv import load_dotenv
+from email_validator import validate_email, EmailNotValidError
 
 # Load environment variables
 load_dotenv()
@@ -124,15 +125,15 @@ def before_request():
         return jsonify({'error': 'Access denied. Your IP is not authorized to access this environment.'}), 403
 
 # Basic configuration
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY')
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///job_sight.db')
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False #Setting it to False inceases performance, it tracks changes to objects
 
 # Initialize extensions
-db = SQLAlchemy(app)
-login_manager = LoginManager()
-login_manager.init_app(app)
-login_manager.login_view = 'login'
+db = SQLAlchemy(app) #Creates database connection object using the Flask app
+login_manager = LoginManager() #Creates login manager object for handling user authentication
+login_manager.init_app(app) #Connects the login manager to the Flask app
+login_manager.login_view = 'login' #Tells the login manager which page to redirect to for login
 
 # Database Models
 class User(db.Model):
@@ -485,6 +486,14 @@ def register():
         # Basic validation
         if not all([username, email, first_name, last_name, password, password2]):
             flash('All fields are required', 'error')
+            return render_template('auth/register.html')
+        
+        # Validate email format
+        try:
+            valid_email = validate_email(email)
+            email = valid_email.email  # Get normalized email (lowercase, etc.)
+        except EmailNotValidError:
+            flash('Please enter a valid email address', 'error')
             return render_template('auth/register.html')
         
         if password != password2:

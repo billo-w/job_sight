@@ -1,6 +1,10 @@
 # Job Sight
 
-A Flask web application that helps users search for jobs and get AI-powered insights about the job market.
+Visit the site below:
+
+https://job-sight.app
+
+A web application that helps users search for jobs and get AI-powered insights about the job market.
 
 ## What This Application Does
 
@@ -53,6 +57,6 @@ Visit `http://localhost:5000` to use the application.
 ## Technology Stack
 
 - **Backend**: Flask (Python web framework)
-- **Database**: SQLite (for user accounts and saved jobs)
+- **Database**: PostgreSQL (for user accounts and saved jobs)
 - **External APIs**: Adzuna Jobs API, Azure AI
 - **Frontend**: HTML/CSS with responsive design

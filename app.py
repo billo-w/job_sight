@@ -7,7 +7,6 @@ import requests
 import os
 import logging
 import sys
-import json
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -50,10 +49,15 @@ def setup_logging():
     console_handler.setFormatter(JSONStreamFormatter())
     
     # Configure root logger
-    root_logger = logging.getLogger()
-    root_logger.setLevel(getattr(logging, log_level, logging.INFO))
-    root_logger.addHandler(console_handler)
-    root_logger.addHandler(file_handler)
+    logging.basicConfig(
+        level=getattr(logging, log_level, logging.INFO),
+        format=log_format,
+        handlers=[
+            logging.StreamHandler(sys.stdout),
+            logging.FileHandler('job_sight.log', mode='a')
+        ],
+        force=True  # Force reconfiguration
+    )
     
     # Create application logger
     logger = logging.getLogger('job_sight')

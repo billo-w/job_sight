@@ -7,6 +7,17 @@ terraform {
   }
 }
 
+# DigitalOcean App Platform static ingress IP addresses
+# These are global, shared IPs that route traffic to your app
+locals {
+  app_platform_static_ips = {
+    ipv4 = [
+      "162.159.140.98",
+      "172.66.0.96"
+    ]
+  }
+}
+
 # Separate app for testing environments
 resource "digitalocean_app" "testing_app" {
   # Only create this resource if it's a testing environment
@@ -15,6 +26,8 @@ resource "digitalocean_app" "testing_app" {
   spec {
     name   = var.app_name
     region = "lon"
+
+
 
     alert {
       rule = "DEPLOYMENT_FAILED"
@@ -291,11 +304,6 @@ resource "digitalocean_app" "app" {
         value = join(",", var.allowed_ips)
         type = "SECRET"
       }
-    }
-    env {
-      key   = "ALLOWED_IPS"
-      value = join(",", var.allowed_ips)
-      type = "SECRET"
     }
   }
 }

@@ -84,7 +84,6 @@ migrations/versions/
 
 # Terraform
 .terraform/
-.terraform.lock.hcl
 *.tfstate
 *.tfstate.*
 *.tfvars
@@ -93,7 +92,6 @@ migrations/versions/
 !*.tfvars.example
 
 # Docker
-.dockerignore
 docker-compose.override.yml
 
 # Testing
@@ -140,5 +138,5 @@ monitoring/local/
 monitoring/secrets/
 
 .cursor/
-CALUDE.md
+CLAUDE.md
 .claude

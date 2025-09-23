@@ -7,6 +7,7 @@ import requests
 import os
 import logging
 import sys
+import json
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -14,26 +15,45 @@ load_dotenv()
 
 # Configure logging
 def setup_logging():
-    """Configure application logging with proper levels and security"""
+    """Configure application logging with JSON format for BetterStack compatibility"""
     log_level = os.environ.get('LOG_LEVEL', 'INFO').upper()
     
-    # Use a format that includes log level and timestamp for Better Stack
-    log_format = '[%(levelname)s] %(asctime)s - %(name)s - %(message)s'
+    # Custom JSON formatter function
+    def json_formatter(record):
+        log_entry = {
+            'timestamp': datetime.fromtimestamp(record.created).strftime('%Y-%m-%d %H:%M:%S'),
+            'level': record.levelname,
+            'logger': record.name,
+            'message': record.getMessage()
+        }
+        return json.dumps(log_entry)
     
     # Clear any existing handlers to avoid duplicates
     for handler in logging.root.handlers[:]:
         logging.root.removeHandler(handler)
     
+    # Create console handler with JSON formatting
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setLevel(getattr(logging, log_level, logging.INFO))
+    
+    # Create file handler with readable format for local debugging
+    file_handler = logging.FileHandler('job_sight.log', mode='a')
+    file_handler.setLevel(getattr(logging, log_level, logging.INFO))
+    file_format = logging.Formatter('[%(levelname)s] %(asctime)s - %(name)s - %(message)s')
+    file_handler.setFormatter(file_format)
+    
+    # Set custom JSON formatter for console output
+    class JSONStreamFormatter(logging.Formatter):
+        def format(self, record):
+            return json_formatter(record)
+    
+    console_handler.setFormatter(JSONStreamFormatter())
+    
     # Configure root logger
-    logging.basicConfig(
-        level=getattr(logging, log_level, logging.INFO),
-        format=log_format,
-        handlers=[
-            logging.StreamHandler(sys.stdout),
-            logging.FileHandler('job_sight.log', mode='a')
-        ],
-        force=True  # Force reconfiguration
-    )
+    root_logger = logging.getLogger()
+    root_logger.setLevel(getattr(logging, log_level, logging.INFO))
+    root_logger.addHandler(console_handler)
+    root_logger.addHandler(file_handler)
     
     # Create application logger
     logger = logging.getLogger('job_sight')

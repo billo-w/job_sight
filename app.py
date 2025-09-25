@@ -10,6 +10,7 @@ import sys
 import json
 from dotenv import load_dotenv
 from email_validator import validate_email, EmailNotValidError
+from markdown import markdown as render_markdown
 
 # Load environment variables
 load_dotenv()
@@ -304,9 +305,10 @@ class AIService:
             response.raise_for_status()
             result = response.json()
             
-            summary = result['choices'][0]['message']['content'].strip()
+            summary_markdown = result['choices'][0]['message']['content'].strip()
+            summary_html = render_markdown(summary_markdown, extensions=['extra'])
             logger.info("Successfully generated AI summary")
-            return {'summary': summary, 'error': False}
+            return {'summary': summary_html, 'error': False, 'job_count': len(job_results)}
             
         except requests.exceptions.Timeout:
             logger.error(f"Timeout error when generating AI summary for '{job_title}' in '{location}'")

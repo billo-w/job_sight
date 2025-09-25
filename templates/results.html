@@ -26,7 +26,7 @@
     <h2>AI Market Insights</h2>
     <p>Powered by GPT-4o • {{ ai_summary.job_count }} jobs analysed</p>
     <div class="ai-content">
-        {{ ai_summary.summary }}
+        {{ ai_summary.summary | safe }}
     </div>
 </div>
 {% elif ai_summary and ai_summary.error %}

@@ -171,6 +171,15 @@ resource "digitalocean_project" "project" {
   is_default  = true
 }
 
+resource "digitalocean_database_firewall" "db_firewall" {
+  cluster_id = digitalocean_database_cluster.pg.id
+
+  rule {
+    type  = "app"
+    value = digitalocean_app.testing_app[0].id
+  }
+}
+
 resource "digitalocean_app" "app" {
   # Ensure registry is created first (only in production)
   depends_on = [digitalocean_container_registry.app_registry]

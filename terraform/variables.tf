@@ -32,10 +32,17 @@ variable "azure_ai_key" {
   sensitive   = true
 }
 
+
+
 variable "database_url" {
   description = "Connection string for PostgreSQL database"
   type        = string
   sensitive   = true
+}
+
+variable "database_cluster_id" {
+  description = "ID of the long-lived DigitalOcean PostgreSQL cluster to secure"
+  type        = string
 }
 
 variable "secret_key" {
@@ -107,3 +114,4 @@ variable "app_version" {
   type        = string
   default     = "1.0.0"
 }
+

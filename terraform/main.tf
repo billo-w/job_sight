@@ -171,14 +171,35 @@ resource "digitalocean_project" "project" {
   is_default  = true
 }
 
-resource "digitalocean_database_firewall" "db_firewall" {
-  cluster_id = digitalocean_database_cluster.pg.id
+# Reference existing long-lived database cluster by ID so Terraform only manages the firewall rules
+# Collect app IDs for firewall trust rules across environments
+locals {
+  trusted_app_ids = concat(
+    var.flask_env == "testing" ? [for app in digitalocean_app.testing_app : app.id] : [],
+    var.flask_env == "production" ? [for app in digitalocean_app.app : app.id] : []
+  )
+}
 
-  rule {
-    type  = "app"
-    value = digitalocean_app.testing_app[0].id
+resource "digitalocean_database_firewall" "db_firewall" {
+  cluster_id = var.database_cluster_id
+
+  dynamic "rule" {
+    for_each = local.trusted_app_ids
+    content {
+      type  = "app"
+      value = rule.value
+    }
+  }
+
+  dynamic "rule" {
+    for_each = toset(local.app_platform_static_ips.ipv4)
+    content {
+      type  = "ip_addr"
+      value = rule.value
+    }
   }
 }
+
 
 resource "digitalocean_app" "app" {
   # Ensure registry is created first (only in production)
@@ -316,3 +337,4 @@ resource "digitalocean_app" "app" {
     }
   }
 }
+

@@ -8,6 +8,12 @@ import os
 import logging
 import sys
 import json
+import time
+try:
+    import signal
+except ImportError:
+    signal = None
+from contextlib import contextmanager
 from dotenv import load_dotenv
 from email_validator import validate_email, EmailNotValidError
 from markdown import markdown as render_markdown
@@ -70,6 +76,32 @@ def setup_logging():
     logging.getLogger('sqlalchemy.orm').setLevel(logging.WARNING)  # Hide ORM details
     
     return logger
+
+# Lightweight timeout helper so health checks cannot hang indefinitely
+class HealthCheckTimeout(Exception):
+    """Raised when the database connectivity probe exceeds the allowed time."""
+
+def healthcheck_timeout(seconds):
+    """Context manager that aborts the block if it exceeds ``seconds`` using SIGALRM."""
+    if not signal or not hasattr(signal, "setitimer") or seconds <= 0:
+        @contextmanager
+        def _noop():
+            yield
+        return _noop()
+    @contextmanager
+    def _with_timeout():
+        previous = signal.getsignal(signal.SIGALRM)
+        def _handler(signum, frame):
+            raise HealthCheckTimeout()
+        try:
+            signal.signal(signal.SIGALRM, _handler)
+            signal.setitimer(signal.ITIMER_REAL, seconds)
+            yield
+        finally:
+            signal.setitimer(signal.ITIMER_REAL, 0)
+            signal.signal(signal.SIGALRM, previous)
+    return _with_timeout()
+
 
 # Setup logging
 logger = setup_logging()
@@ -324,20 +356,43 @@ class AIService:
 @app.route('/health')
 def health_check():
     """Health check endpoint for monitoring."""
+    start_time = time.monotonic()
+    db_status = 'skipped'
+    verify_db = os.environ.get('HEALTHCHECK_VERIFY_DB', 'true').lower() == 'true'
     try:
-        # Test database connection using proper SQLAlchemy syntax
-        from sqlalchemy import text
-        db.session.execute(text('SELECT 1'))
-        db_status = 'connected'
-    except Exception as e:
-        db_status = f'error: {str(e)}'
-    
+        db_timeout = int(os.environ.get('DB_HEALTH_TIMEOUT', '5'))
+    except ValueError:
+        db_timeout = 5
+
+    if verify_db:
+        try:
+            from sqlalchemy import text
+            logger.debug("Health check: probing database (timeout=%ss)", db_timeout)
+            with healthcheck_timeout(db_timeout):
+                db.session.execute(text('SELECT 1'))
+            db_status = 'connected'
+        except HealthCheckTimeout:
+            logger.error("Health check database probe exceeded %s seconds", db_timeout)
+            db_status = f'timeout after {db_timeout}s'
+        except Exception as exc:
+            logger.error("Health check database probe failed: %s", exc)
+            db_status = f'error: {str(exc)}'
+        finally:
+            db.session.rollback()
+    else:
+        logger.debug("Health check: skipping database probe (HEALTHCHECK_VERIFY_DB=false)")
+
+    duration_ms = int((time.monotonic() - start_time) * 1000)
+    status = 'healthy' if (not verify_db or db_status == 'connected') else 'degraded'
+    logger.debug("Health check responded in %dms (status=%s, database=%s)", duration_ms, status, db_status)
+
     return jsonify({
-        'status': 'healthy', 
+        'status': status,
         'message': 'Job Sight application is running',
         'environment': os.environ.get('FLASK_ENV', 'unknown'),
         'database': db_status,
-        'ip_restrictions': os.environ.get('ENABLE_IP_RESTRICTIONS', 'false')
+        'ip_restrictions': os.environ.get('ENABLE_IP_RESTRICTIONS', 'false'),
+        'response_time_ms': duration_ms
     })
 
 @app.route('/')

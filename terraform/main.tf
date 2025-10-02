@@ -174,9 +174,9 @@ resource "digitalocean_project" "project" {
 # Reference existing long-lived database cluster by ID so Terraform only manages the firewall rules
 # Collect app IDs for firewall trust rules across environments
 locals {
-  trusted_app_ids = concat(
-    var.flask_env == "testing" ? [for app in digitalocean_app.testing_app : app.id] : [],
-    var.flask_env == "production" ? [for app in digitalocean_app.app : app.id] : []
+  trusted_app_rules = merge(
+    var.flask_env == "testing" ? { for app in digitalocean_app.testing_app : app.id => app.id } : {},
+    var.flask_env == "production" ? { for app in digitalocean_app.app : app.id => app.id } : {}
   )
 }
 
@@ -184,7 +184,7 @@ resource "digitalocean_database_firewall" "db_firewall" {
   cluster_id = var.database_cluster_id
 
   dynamic "rule" {
-    for_each = local.trusted_app_ids
+    for_each = local.trusted_app_rules
     content {
       type  = "app"
       value = rule.value
@@ -337,4 +337,5 @@ resource "digitalocean_app" "app" {
     }
   }
 }
+
 

@@ -146,6 +146,12 @@ resource "digitalocean_app" "testing_app" {
         value = join(",", var.allowed_ips)
         type = "SECRET"
       }
+      # Disable database health checks during deployment to avoid circular dependency
+      env {
+        key   = "HEALTHCHECK_VERIFY_DB"
+        value = "false"
+        type = "SECRET"
+      }
     }
   }
 }
@@ -330,6 +336,12 @@ resource "digitalocean_app" "app" {
       env {
         key   = "ALLOWED_IPS"
         value = join(",", var.allowed_ips)
+        type = "SECRET"
+      }
+      # Disable database health checks during deployment to avoid circular dependency
+      env {
+        key   = "HEALTHCHECK_VERIFY_DB"
+        value = "false"
         type = "SECRET"
       }
     }

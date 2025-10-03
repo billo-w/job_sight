@@ -171,35 +171,33 @@ resource "digitalocean_project" "project" {
   is_default  = true
 }
 
-# Reference existing long-lived database cluster by ID so Terraform only manages the firewall rules
-# Collect app IDs for firewall trust rules across environments
-locals {
-  trusted_app_rules = merge(
-    var.flask_env == "testing" ? { for app in digitalocean_app.testing_app : app.id => app.id } : {},
-    var.flask_env == "production" ? { for app in digitalocean_app.app : app.id => app.id } : {}
-  )
-}
-
+# Database firewall to automatically allow App Platform apps to connect
 resource "digitalocean_database_firewall" "db_firewall" {
   cluster_id = var.database_cluster_id
 
+  # Allow production app when in production
   dynamic "rule" {
-    for_each = local.trusted_app_rules
+    for_each = var.flask_env == "production" ? [1] : []
     content {
       type  = "app"
-      value = rule.value
+      value = digitalocean_app.app[0].id
     }
   }
 
+  # Allow testing app when in testing
   dynamic "rule" {
-    for_each = toset(local.app_platform_static_ips.ipv4)
+    for_each = var.flask_env == "testing" ? [1] : []
     content {
-      type  = "ip_addr"
-      value = rule.value
+      type  = "app"
+      value = digitalocean_app.testing_app[0].id
     }
   }
-}
 
+  depends_on = [
+    digitalocean_app.app,
+    digitalocean_app.testing_app
+  ]
+}
 
 resource "digitalocean_app" "app" {
   # Ensure registry is created first (only in production)
